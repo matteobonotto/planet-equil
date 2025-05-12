@@ -1,1 +1,0 @@
-python ./scripts/main.py -c ./config/config_train_TF.yml

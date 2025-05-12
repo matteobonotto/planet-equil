@@ -83,7 +83,8 @@ trained_models_tf/*
 
 poetry.lock
 
-
+!trained_models/planet_physics_informed
+!trained_models/planet_no_physics_informed
 
 
 

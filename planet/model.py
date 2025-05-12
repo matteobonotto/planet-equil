@@ -10,46 +10,11 @@ import numpy as np
 from matplotlib import pyplot as plt
 import matplotlib.lines as mlines
 
-
-def fun_contourf_sol(z, RR, ZZ):
-    plt.figure()
-    plt.contourf(RR, ZZ, z, 20)
-    plt.axis("equal")
-    plt.colorbar()
-    plt.show()
-    return
-
-
-def fun_contour_sol(z, RR, ZZ):
-    plt.figure()
-    plt.contour(RR, ZZ, z, 20)
-    plt.axis("equal")
-    plt.colorbar()
-    plt.show()
-    return
-
-
-def fun_contour_compare_sol(z_ref, z, RR, ZZ):
-    l1 = mlines.Line2D([], [], label="DNN")
-    l2 = mlines.Line2D([], [], color="black", label="FRIDA")
-
-    plt.figure()
-    plt.contour(RR, ZZ, z, 10)
-    plt.colorbar()
-    plt.contour(RR, ZZ, z_ref, 10, colors="black", linestyles="dashed")
-    plt.legend(handles=[l1, l2])
-    plt.axis("equal")
-    plt.show()
-    return
+from .config import PlaNetConfig
 
 
 DTYPE = torch.float32
 
-# Gauss_tensor = tf.expand_dims(
-#     tf.expand_dims(Gaussian_kernel[::-1, ::-1], axis=-1), axis=-1
-# )
-
-# Gauss_tensor = torch.tensor(Gauss_tensor, dtype=DTYPE)
 
 
 class TrainableSwish(nn.Module):
@@ -278,6 +243,8 @@ class Decoder(nn.Module):
 
         x = self.conv(x).squeeze()
         return x
+    
+
 
 
 class PlaNetCore(nn.Module):
@@ -289,6 +256,9 @@ class PlaNetCore(nn.Module):
         branch_in_dim: int = 302,
     ):
         super().__init__()
+        self.config = PlaNetConfig(
+            nr=nr, nz=nz, hidden_dim=hidden_dim, branch_in_dim=branch_in_dim
+        )
         self.trunk = TrunkNet(hidden_dim=hidden_dim, nr=nr, nz=nz)
         self.branch = BranchNet(hidden_dim=hidden_dim, in_dim=branch_in_dim)
         self.decoder = Decoder(hidden_dim=hidden_dim, nr=nr, nz=nz)
@@ -298,3 +268,5 @@ class PlaNetCore(nn.Module):
         out_branch = self.branch(x_meas)
         out_trunk = self.trunk(x_r, x_z)
         return self.decoder(out_branch, out_trunk)
+    
+
