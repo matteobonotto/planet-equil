@@ -1,7 +1,4 @@
-
-from planet.utils import (
-    parse_arguments, load_config
-)
+from planet.utils import parse_arguments, load_config
 from planet.train import main_train
 
 

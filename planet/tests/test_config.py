@@ -15,4 +15,5 @@ def test_config():
         branch_in_dim=10000,
     )
 
+
 test_config()

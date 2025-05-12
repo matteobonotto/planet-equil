@@ -8,13 +8,14 @@ import torch.nn.functional as F
 Gauss_kernel_3x3 = np.array(([1, 2, 1], [2, 4, 2], [1, 2, 1])) / (16)
 Gauss_kernel_5x5 = np.array(
     (
-        [1,4,7,4,1],
-        [4,16,26,16,4],
-        [7,26,41,26,7],
-        [4,16,26,16,4],
-        [1,4,7,4,1]
+        [1, 4, 7, 4, 1],
+        [4, 16, 26, 16, 4],
+        [7, 26, 41, 26, 7],
+        [4, 16, 26, 16, 4],
+        [1, 4, 7, 4, 1],
     )
-)/(273)
+) / (273)
+
 
 def _compute_grad_shafranov_operator(
     pred: Tensor,

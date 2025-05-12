@@ -50,13 +50,13 @@ def save_model_and_scaler(
     save_dir.mkdir(exist_ok=True, parents=True)
 
     # save model config
-    json.dump(config.planet.to_dict(), open(save_dir / Path("config.json"), 'w'))
-    
+    json.dump(config.planet.to_dict(), open(save_dir / Path("config.json"), "w"))
+
     # save model
     planet_model = trainer.model.model
     planet_model.eval()
     torch.save(planet_model.state_dict(), save_dir / Path("model.pt"))
-    
+
     # save scaler
     with open(save_dir / Path("scaler.pkl"), "wb") as f:
         pickle.dump(scaler, f)
@@ -69,7 +69,6 @@ def get_accelerator() -> Optional[str]:
         return "cuda"
     else:
         return None
-
 
 
 def write_h5(

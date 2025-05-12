@@ -15,9 +15,7 @@ from .config import Config
 from .model import PlaNetCore
 from .loss import PlaNetLoss
 from .data import PlaNetDataset, get_device
-from .utils import (
-    get_accelerator, last_ckp_path, save_model_and_scaler
-)
+from .utils import get_accelerator, last_ckp_path, save_model_and_scaler
 
 
 def collate_fun(batch: Tuple[Tuple[Tensor]]) -> Tuple[Tensor]:
@@ -82,9 +80,7 @@ class DataModule(L.LightningDataModule):
 class LightningPlaNet(L.LightningModule):
     def __init__(self, config: Config):
         super().__init__()
-        self.model = PlaNetCore(
-            **config.planet.to_dict()
-        )
+        self.model = PlaNetCore(**config.planet.to_dict())
         self.loss_module = PlaNetLoss(is_physics_informed=config.is_physics_informed)
 
     def _compute_loss_batch(self, batch, batch_idx):
@@ -119,8 +115,6 @@ class LightningPlaNet(L.LightningModule):
 
     def configure_optimizers(self):
         return torch.optim.AdamW(self.parameters(), lr=0.001)
-
-
 
 
 def main_train(config: Config):

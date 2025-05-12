@@ -16,7 +16,6 @@ from .config import PlaNetConfig
 DTYPE = torch.float32
 
 
-
 class TrainableSwish(nn.Module):
     def __init__(self, beta: float = 1.0):
         super().__init__()
@@ -243,8 +242,6 @@ class Decoder(nn.Module):
 
         x = self.conv(x).squeeze()
         return x
-    
-
 
 
 class PlaNetCore(nn.Module):
@@ -268,5 +265,3 @@ class PlaNetCore(nn.Module):
         out_branch = self.branch(x_meas)
         out_trunk = self.trunk(x_r, x_z)
         return self.decoder(out_branch, out_trunk)
-    
-

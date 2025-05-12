@@ -210,4 +210,3 @@ class PlaNetDataset:
             dtype=self.dtype,
             inputs=(inputs, flux, rhs, RR, ZZ, L_ker, Df_ker),
         )
-
