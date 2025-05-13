@@ -1,23 +1,85 @@
-
-
-
-from typing import Dict, List, Tuple
-import torch
-from torch import Tensor, nn
+from __future__ import annotations
+import random
 import numpy as np
+from numpy import ndarray
+from functools import partial
+from typing import Optional, Tuple, Any, List, Dict, List, Tuple
+import torch
+from pathlib import Path
+from sklearn.preprocessing import StandardScaler
+from dataclasses import dataclass, asdict
+import yaml
+from torchinfo import summary
+
+from multiprocessing import cpu_count
+from torch import Tensor, nn, autograd
 import torch.nn.functional as F
 
+import lightning as L
+from lightning import Trainer
+from lightning.pytorch.callbacks import ModelCheckpoint, Callback
+from lightning.pytorch.loggers import WandbLogger
 
 
+from torch.utils.data import DataLoader, Subset
+
+from planet.utils import read_h5_numpy, get_accelerator, last_ckp_path, save_model_and_scaler
+from planet.constants import RANDOM_SEED
 
 
+random.seed(RANDOM_SEED)
 DTYPE = torch.float32
 
-# Gauss_tensor = tf.expand_dims(
-#     tf.expand_dims(Gaussian_kernel[::-1, ::-1], axis=-1), axis=-1
-# )
 
-# Gauss_tensor = torch.tensor(Gauss_tensor, dtype=DTYPE)
+@dataclass
+class PlaNetMLPConfig:
+    meas_dim: int = 302
+    hidden_dim: int = 128
+    n_layers: int = 3
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class Config:
+    is_physics_informed: bool = True
+    dataset_path: Optional[str] = None
+    batch_size: int = 64
+    epochs: int = 10
+    # hidden_dim: int = 128
+    # nr: int = 64
+    # nz: int = 64
+    # branch_in_dim: int = 302
+    planet: Optional[PlaNetMLPConfig] = None
+    log_to_wandb: bool = False
+    wandb_project: Optional[str] = None
+    save_checkpoints: bool = False
+    save_path: str = "tmp/model.pt"
+    resume_from_checkpoint: bool = False
+    num_workers: int = 4
+    do_super_resolution: bool = False
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, config_dict: Dict[str, Any]) -> Config:
+
+        cls_instance = cls()
+        for k, v in config_dict.items():
+            if k in cls_instance.__dict__.keys():
+                setattr(cls_instance, k, v)
+
+        if hasattr(cls_instance, "planet"):
+            cls_instance.planet = PlaNetMLPConfig(**cls_instance.planet)
+
+        return cls_instance
+
+
+def load_config(path: str) -> Config:
+    config_dict = yaml.safe_load(open(path, "r"))
+    return Config.from_dict(config_dict=config_dict)
 
 
 class TrainableSwish(nn.Module):
@@ -33,7 +95,7 @@ def swish(x: Tensor, beta: float = 1.0) -> Tensor:
     return x * F.sigmoid(beta * x)
 
 
-class LineardNornAct(nn.Module):
+class LineardNormAct(nn.Module):
     def __init__(
         self,
         in_features: int,
@@ -41,7 +103,7 @@ class LineardNornAct(nn.Module):
     ):
         super().__init__()
         self.linear = nn.Linear(in_features=in_features, out_features=out_features)
-        self.norm = nn.BatchNorm2d(num_features=out_features)
+        self.norm = nn.BatchNorm1d(num_features=out_features)
         self.act = TrainableSwish()
 
     def forward(self, x: Tensor) -> Tensor:
@@ -49,25 +111,29 @@ class LineardNornAct(nn.Module):
 
 
 class MLPStack(nn.Module):
-    def __init__(self, in_dim: int, out_dim: int, n_layers: int = 3, hidden_dim: int = 128):
+    def __init__(
+        self, in_dim: int, out_dim: int, n_layers: int = 3, hidden_dim: int = 128
+    ):
         super().__init__()
 
-        self.layers = nn.ModuleList()
+        layers = []
         for i in range(n_layers):
             if i == 0:
                 in_features, out_features = in_dim, hidden_dim
-            elif i == n_layers -1:
+                layers.append(LineardNormAct(in_features, out_features))
+            elif i == n_layers - 1:
                 in_features, out_features = hidden_dim, out_dim
+                layers.append(nn.Linear(in_features, out_features)) 
             else:
                 in_features, out_features = hidden_dim, hidden_dim
-            self.layers.append(
-                LineardNornAct(in_features=in_features, out_features=out_features)
-            )
+                layers.append(LineardNormAct(in_features, out_features))
+        self.layers = nn.ModuleList(layers)
 
     def forward(self, x: Tensor) -> Tensor:
         for layer in self.layers:
             x = layer(x)
         return x
+
 
 class PlaNetCoreMLP(nn.Module):
     def __init__(
@@ -82,17 +148,16 @@ class PlaNetCoreMLP(nn.Module):
         self.decoder = MLPStack(in_dim=hidden_dim, out_dim=1, n_layers=n_layers)
 
     def forward(self, x: Tensor) -> Tensor:
-        x_meas, rz = x[:, :-2], x[:, -2:]
+        x_meas, rz = x
         out_branch = self.branch(x_meas)
         out_trunk = self.trunk(rz)
         return self.decoder(out_branch * out_trunk)
-    
 
-    
 
 def compute_partial_derivative(f: Tensor, var: Tensor) -> Tensor:
-    d = torch.autograd.grad(f, var, grad_outputs=torch.ones_like(f), create_graph=True)[0]
+    d = autograd.grad(f, var, grad_outputs=torch.ones_like(f), create_graph=True)[0]
     return d
+
 
 def compute_gso(pred: Tensor, rz: Tensor) -> Tensor:
     # Create coordinates with requires_grad=True
@@ -114,6 +179,7 @@ def compute_gso(pred: Tensor, rz: Tensor) -> Tensor:
 
     gso = d2f_dr2 + d2f_dz2 - df_dr / r
     return gso
+
 
 class GSOperatorLoss(nn.Module):
     def __init__(self):
@@ -166,14 +232,11 @@ class PlaNetLoss(nn.Module):
         else:
             pde_loss = self.scale_pde * self.loss_pde(
                 pred=pred,
-                rhs=rhs, 
+                rhs=rhs,
                 rz=rz,
             )
             self.log_dict["pde_loss"] = pde_loss.item()
             return mse_loss + pde_loss
-
-
-
 
 
 def _to_tensor(
@@ -206,120 +269,71 @@ class PlaNetDataset:
         path: str,
         dtype: torch.dtype = torch.float32,
         is_physics_informed: bool = True,
-        nr: int = 64,
-        nz: int = 64,
-        do_super_resolution: bool = False,
     ):
         self.dtype = dtype
         self.device = get_device()
-        self.scaler = StandardScaler()
+        self.scaler_inputs = StandardScaler()
+        self.scaler_rz = StandardScaler()
         self.is_physics_informed = is_physics_informed
-        self.nr = nr
-        self.nz = nz
-        self.do_super_resolution = do_super_resolution
 
         data = read_h5_numpy(path)
-        self.inputs = self.scaler.fit_transform(
-            np.column_stack(
-                (data["measures"], data["coils_current"], data["p_profile"])
-            )
+        n_sample, nr, nz = data["flux"].shape
+
+        self.inputs = np.column_stack(
+            (data["measures"], data["coils_current"], data["p_profile"])
         )
+        self.inputs = self.scaler_inputs.fit_transform(self.inputs)
 
-        self.flux = data["flux"]
-        self.rhs = data["rhs"]
-        self.RR = data["RR_grid"]
-        self.ZZ = data["ZZ_grid"]
+        self.map_equil_idx = (
+            np.arange(n_sample)[:, None, None] * np.ones((nr, nz), dtype=int)
+        ).ravel()
+        self.flux = data["flux"].ravel()
+        self.rhs = data["rhs"].ravel()
 
-        if self.nr != self.RR.shape[0] or self.nz != self.RR.shape[1]:
-            rr = np.linspace(self.RR[0, 0], self.RR[0, -1], self.nr)
-            zz = np.linspace(self.ZZ[0, 0], self.RR[-1, 0], self.nr)
-            self.RR, self.ZZ = np.meshgrid(rr, zz)
-            self.base_RR, self.base_ZZ = data["RR_grid"], data["ZZ_grid"]
-
-        self.sample_random_subgrids = partial(
-            sample_random_subgrids,
-            RR_min=self.RR.min(),
-            RR_max=self.RR.max(),
-            ZZ_min=self.ZZ.min(),
-            ZZ_max=self.ZZ.max(),
-            nr=self.RR.shape[0],
-            nz=self.RR.shape[1],
-            seed=RANDOM_SEED,
+        self.rz = np.column_stack(
+            [
+                np.repeat(data["RR_grid"][None, ...], n_sample, axis=0).reshape(-1, 1),
+                np.repeat(data["ZZ_grid"][None, ...], n_sample, axis=0).reshape(-1, 1),
+            ]
         )
+        self.rz = self.scaler_rz.fit_transform(self.rz)
 
     def get_scaler(self) -> StandardScaler:
         return self.scaler
 
     def __len__(self) -> int:
-        return self.inputs.shape[0]
+        return self.map_equil_idx.shape[0]
 
     def __getitem__(self, idx: int) -> Tuple[Tensor]:
-        inputs = self.inputs[idx, ...]
-        flux = self.flux[idx, ...]
-        rhs = self.rhs[idx, ...]
-        RR = self.RR
-        ZZ = self.ZZ
+        idx_equil = self.map_equil_idx[idx]
 
-        if flux.shape[1] != RR.shape[0] or flux.shape[1] != RR.shape[1]:
-            flux = interp_fun(
-                f=flux, RR=self.base_RR, ZZ=self.base_ZZ, rr=self.RR, zz=self.ZZ
-            )
-            rhs = interp_fun(
-                f=rhs, RR=self.base_RR, ZZ=self.base_ZZ, rr=self.RR, zz=self.ZZ
-            )
-
-        if random.random() > 0.5 and self.do_super_resolution:
-            # interpolate on a subgrid
-            rr, zz = self.sample_random_subgrids()
-            flux = interp_fun(f=flux, RR=self.RR, ZZ=self.ZZ, rr=rr, zz=zz)
-            if self.is_physics_informed:
-                rhs = interp_fun(
-                    f=rhs,
-                    RR=self.RR,
-                    ZZ=self.ZZ,
-                    rr=rr[1:-1, 1:-1],
-                    zz=zz[1:-1, 1:-1],
-                )
-            else:
-                rhs = np.zeros_like(rhs[1:-1, 1:-1])
-            RR = rr
-            ZZ = zz
-        else:
-            rhs = rhs[1:-1, 1:-1]
-
-        L_ker, Df_ker = compute_Grda_Shafranov_kernels(RR=RR, ZZ=ZZ)
+        inputs = self.inputs[idx_equil, ...]
+        flux = self.flux[idx]
+        rhs = self.rhs[idx]
+        rz = self.rz[idx, :]
 
         return _to_tensor(
             device=self.device,
             dtype=self.dtype,
-            inputs=(inputs, flux, rhs, RR, ZZ, L_ker, Df_ker),
+            inputs=(inputs, flux, rhs, rz),
         )
-
-
-
 
 
 def collate_fun(batch: Tuple[Tuple[Tensor]]) -> Tuple[Tensor]:
     return (
-        torch.stack([s[0] for s in batch], dim=0),  # measures
+        torch.stack([s[0] for s in batch], dim=0),  # inputs
         torch.stack([s[1] for s in batch], dim=0),  # flux
         torch.stack([s[2] for s in batch], dim=0),  # rhs
-        torch.stack([s[3] for s in batch], dim=0),  # RR
-        torch.stack([s[4] for s in batch], dim=0),  # ZZ
-        torch.stack([s[5] for s in batch], dim=0),  # L_ker
-        torch.stack([s[6] for s in batch], dim=0),  # Dr_ker
+        torch.stack([s[3] for s in batch], dim=0),  # rz
     )
 
 
 class DataModule(L.LightningDataModule):
-    def __init__(self, config: PlaNetConfig):
+    def __init__(self, config: PlaNetMLPConfig):
         super().__init__()
         self.dataset = PlaNetDataset(
             path=config.dataset_path,
             is_physics_informed=config.is_physics_informed,
-            nr=config.nr,
-            nz=config.nz,
-            do_super_resolution=config.do_super_resolution,
         )
         self.batch_size = config.batch_size
         self.num_workers = (
@@ -359,28 +373,19 @@ class DataModule(L.LightningDataModule):
 
 
 class LightningPlaNet(L.LightningModule):
-    def __init__(self, config: PlaNetConfig):
+    def __init__(self, config: Config):
         super().__init__()
-        # device = get_device()
-        self.model = PlaNetCore(
-            hidden_dim=config.hidden_dim,
-            nr=config.nr,
-            nz=config.nz,
-            branch_in_dim=config.branch_in_dim,
-        )
+        self.model = PlaNetCoreMLP(**config.planet.to_dict())
         self.loss_module = PlaNetLoss(is_physics_informed=config.is_physics_informed)
 
     def _compute_loss_batch(self, batch, batch_idx):
-        measures, flux, rhs, RR, ZZ, L_ker, Df_ker = batch
-        pred = self((measures, RR, ZZ))
+        inputs, flux, rhs, rz = batch
+        pred = self((inputs, rz))
         loss = self.loss_module(
             pred=pred,
             target=flux,
             rhs=rhs,
-            Laplace_kernel=L_ker,
-            Df_dr_kernel=Df_ker,
-            RR=RR,
-            ZZ=ZZ,
+            rz=rz,
         )
         return loss
 
@@ -402,3 +407,57 @@ class LightningPlaNet(L.LightningModule):
 
     def configure_optimizers(self):
         return torch.optim.AdamW(self.parameters(), lr=0.001)
+
+
+def main_train(config: Config):
+    #
+    save_dir = Path(config.save_path).parent
+    save_dir.mkdir(exist_ok=True, parents=True)
+
+    ### instantiate model and datamodule
+    model = LightningPlaNet(config=config)
+    datamodule = DataModule(config=config)
+
+    ### define some callbacks
+    callbacks: List[Callback] = []
+    if config.save_checkpoints is not None:
+        callbacks.append(
+            ModelCheckpoint(
+                dirpath=save_dir / Path("ckp"), save_top_k=2, monitor="val_loss"
+            )
+        )
+
+    # get the logger
+    wandb_logger: Optional[WandbLogger] = None
+    if config.log_to_wandb:
+        wandb_logger = WandbLogger(project=config.wandb_project)
+
+    ### train the model
+    trainer = Trainer(
+        max_epochs=config.epochs,
+        accelerator=get_accelerator(),
+        devices="auto",
+        callbacks=callbacks,
+        logger=wandb_logger,
+    )
+    trainer.fit(
+        model=model,
+        datamodule=datamodule,
+        ckpt_path=(
+            last_ckp_path(save_dir / Path("ckp"))
+            if config.resume_from_checkpoint
+            else None
+        ),
+    )
+
+    ### save model + scaler for inference
+    save_model_and_scaler(trainer, datamodule.dataset.scaler, config)
+
+
+if __name__ == "__main__":
+
+    # load config
+    # args = parse_arguments()
+    cfg_path = "config/config_mlp.yml"
+    config = load_config(cfg_path)
+    main_train(config=config)

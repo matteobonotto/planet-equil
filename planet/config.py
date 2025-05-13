@@ -5,10 +5,10 @@ from typing import Dict, Any, Optional
 
 @dataclass
 class PlaNetConfig:
-    hidden_dim: int = (128,)
-    nr: int = (64,)
-    nz: int = (64,)
-    branch_in_dim: int = (302,)
+    hidden_dim: int = 128
+    nr: int = 64
+    nz: int = 64
+    branch_in_dim: int = 302
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

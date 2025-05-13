@@ -1,0 +1,14 @@
+is_physics_informed: true
+save_path:  'trained_models/mlp/'
+dataset_path: planet/tests/data/iter_like_data_sample.h5 
+batch_size: 16
+epochs: 10
+# log_to_wandb: true
+wandb_project: planet_mlp_test
+save_checkpoints: true
+resume_from_checkpoint: false
+num_workers: 0
+planet:
+  meas_dim: 302
+  hidden_dim: 128
+  n_layers: 3
