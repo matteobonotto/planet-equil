@@ -1,19 +1,21 @@
-# import os
-# import sys
-# sys.path.append(os.getcwd())
-
-from typing import TypeAlias, Tuple
+from typing import List, Tuple
 import random
 import torch
+from pathlib import Path
 from torch import Tensor
 import lightning as L
 from torch.utils.data import DataLoader, Subset
 from multiprocessing import cpu_count
 
-from .config import PlaNetConfig
+from lightning import Trainer
+from lightning.pytorch.callbacks import ModelCheckpoint, Callback
+from lightning.pytorch.loggers import WandbLogger
+
+from .config import Config
 from .model import PlaNetCore
 from .loss import PlaNetLoss
 from .data import PlaNetDataset, get_device
+from .utils import get_accelerator, last_ckp_path, save_model_and_scaler
 
 
 def collate_fun(batch: Tuple[Tuple[Tensor]]) -> Tuple[Tensor]:
@@ -29,13 +31,13 @@ def collate_fun(batch: Tuple[Tuple[Tensor]]) -> Tuple[Tensor]:
 
 
 class DataModule(L.LightningDataModule):
-    def __init__(self, config: PlaNetConfig):
+    def __init__(self, config: Config):
         super().__init__()
         self.dataset = PlaNetDataset(
             path=config.dataset_path,
             is_physics_informed=config.is_physics_informed,
-            nr=config.nr,
-            nz=config.nz,
+            nr=config.planet.nr,
+            nz=config.planet.nz,
             do_super_resolution=config.do_super_resolution,
         )
         self.batch_size = config.batch_size
@@ -76,15 +78,9 @@ class DataModule(L.LightningDataModule):
 
 
 class LightningPlaNet(L.LightningModule):
-    def __init__(self, config: PlaNetConfig):
+    def __init__(self, config: Config):
         super().__init__()
-        # device = get_device()
-        self.model = PlaNetCore(
-            hidden_dim=config.hidden_dim,
-            nr=config.nr,
-            nz=config.nz,
-            branch_in_dim=config.branch_in_dim,
-        )
+        self.model = PlaNetCore(**config.planet.to_dict())
         self.loss_module = PlaNetLoss(is_physics_informed=config.is_physics_informed)
 
     def _compute_loss_batch(self, batch, batch_idx):
@@ -120,16 +116,46 @@ class LightningPlaNet(L.LightningModule):
     def configure_optimizers(self):
         return torch.optim.AdamW(self.parameters(), lr=0.001)
 
-    # def on_fit_start(self):
-    #     # Check if everything is correctly on device
-    #     print("\nChecking model parameters devices:")
-    #     for name, param in self.named_parameters():
-    #         print(name, param.device)
 
-    #     print("\nChecking model children modules devices:")
-    #     for name, module in self.named_modules():
-    #         if isinstance(module, torch.nn.Module):
-    #             for pname, p in module.named_parameters(recurse=False):
-    #                 print(f"{name}.{pname} -> {p.device}")
+def main_train(config: Config):
+    #
+    save_dir = Path(config.save_path).parent
+    save_dir.mkdir(exist_ok=True, parents=True)
 
-    #     pass
+    ### instantiate model and datamodule
+    model = LightningPlaNet(config=config)
+    datamodule = DataModule(config=config)
+
+    ### define some callbacks
+    callbacks: List[Callback] = []
+    if config.save_checkpoints is not None:
+        callbacks.append(
+            ModelCheckpoint(
+                dirpath=save_dir / Path("ckp"), save_top_k=2, monitor="val_loss"
+            )
+        )
+
+    # get the logger
+    if config.log_to_wandb:
+        wandb_logger = WandbLogger(project=config.wandb_project)
+
+    ### train the model
+    trainer = Trainer(
+        max_epochs=config.epochs,
+        accelerator=get_accelerator(),
+        devices="auto",
+        callbacks=callbacks,
+        logger=wandb_logger,
+    )
+    trainer.fit(
+        model=model,
+        datamodule=datamodule,
+        ckpt_path=(
+            last_ckp_path(save_dir / Path("ckp"))
+            if config.resume_from_checkpoint
+            else None
+        ),
+    )
+
+    ### save model + scaler for inference
+    save_model_and_scaler(trainer, datamodule.dataset.scaler, config)

@@ -6,9 +6,11 @@ import re
 import torch
 import pickle
 from lightning import Trainer
+import json
+import h5py
+from sklearn.preprocessing import StandardScaler
 
-from .config import PlaNetConfig
-from .train import DataModule
+from .config import Config
 
 
 def parse_arguments() -> Namespace:
@@ -18,9 +20,9 @@ def parse_arguments() -> Namespace:
     return args
 
 
-def load_config(path: str) -> PlaNetConfig:
+def load_config(path: str) -> Config:
     config_dict = yaml.safe_load(open(path, "r"))
-    return PlaNetConfig.from_dict(config_dict=config_dict)
+    return Config.from_dict(config_dict=config_dict)
 
 
 def last_ckp_path(ckpt_path: str) -> Path:
@@ -42,14 +44,20 @@ def last_ckp_path(ckpt_path: str) -> Path:
 
 
 def save_model_and_scaler(
-    trainer: Trainer, datamodule: DataModule, config: PlaNetConfig
+    trainer: Trainer, scaler: StandardScaler, config: Config
 ) -> None:
     save_dir = Path(config.save_path).parent
     save_dir.mkdir(exist_ok=True, parents=True)
-    model = trainer.model.model
-    model.eval()
-    torch.save(trainer.model.state_dict(), config.save_path)
-    scaler = datamodule.dataset.scaler
+
+    # save model config
+    json.dump(config.planet.to_dict(), open(save_dir / Path("config.json"), "w"))
+
+    # save model
+    planet_model = trainer.model.model
+    planet_model.eval()
+    torch.save(planet_model.state_dict(), save_dir / Path("model.pt"))
+
+    # save scaler
     with open(save_dir / Path("scaler.pkl"), "wb") as f:
         pickle.dump(scaler, f)
 
@@ -61,3 +69,37 @@ def get_accelerator() -> Optional[str]:
         return "cuda"
     else:
         return None
+
+
+def write_h5(
+    data: dict,
+    filename: str,
+    dtype: str = "float64",
+    # compression : str = 'lzf',
+    # compression_opts : int = 1,
+    # verbose : bool = False,
+):
+
+    compression: str = "lzf"
+    compression: int = 1
+
+    kwargs = {
+        "dtype": dtype,
+        "compression": compression,
+    }
+
+    # t_start = time.time()
+    with h5py.File(filename + ".h5", "w") as hf:
+        for key, item in data.items():
+            hf.create_dataset(key, data=item, shape=item.shape, **kwargs)
+    hf.close()
+
+
+def read_h5_numpy(
+    filename: str,
+):
+    data = {}
+    with h5py.File(filename, "r") as hf:
+        for key, item in hf.items():
+            data.update({key: item[()]})
+    return data

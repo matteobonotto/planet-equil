@@ -10,8 +10,8 @@ from sklearn.preprocessing import StandardScaler
 import h5py
 from scipy.interpolate import RegularGridInterpolator
 
-
-from planet.constants import RANDOM_SEED
+from .utils import read_h5_numpy
+from .constants import RANDOM_SEED
 
 random.seed(RANDOM_SEED)
 
@@ -210,37 +210,3 @@ class PlaNetDataset:
             dtype=self.dtype,
             inputs=(inputs, flux, rhs, RR, ZZ, L_ker, Df_ker),
         )
-
-
-def write_h5(
-    data: dict,
-    filename: str,
-    dtype: str = "float64",
-    # compression : str = 'lzf',
-    # compression_opts : int = 1,
-    # verbose : bool = False,
-):
-
-    compression: str = "lzf"
-    compression: int = 1
-
-    kwargs = {
-        "dtype": dtype,
-        "compression": compression,
-    }
-
-    # t_start = time.time()
-    with h5py.File(filename + ".h5", "w") as hf:
-        for key, item in data.items():
-            hf.create_dataset(key, data=item, shape=item.shape, **kwargs)
-    hf.close()
-
-
-def read_h5_numpy(
-    filename: str,
-):
-    data = {}
-    with h5py.File(filename, "r") as hf:
-        for key, item in hf.items():
-            data.update({key: item[()]})
-    return data

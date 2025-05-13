@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 
 
-def fun_contourf_sol(z, RR, ZZ, title: str = ""):
+def contourf(z, RR, ZZ, title: str = ""):
     plt.figure()
     plt.contourf(RR, ZZ, z, 20)
     plt.axis("equal")
@@ -12,7 +12,7 @@ def fun_contourf_sol(z, RR, ZZ, title: str = ""):
     return
 
 
-def fun_contour_sol(z, RR, ZZ):
+def contour(z, RR, ZZ):
     plt.figure()
     plt.contour(RR, ZZ, z, 20)
     plt.axis("equal")
@@ -21,7 +21,7 @@ def fun_contour_sol(z, RR, ZZ):
     return
 
 
-def fun_contour_compare_sol(z_ref, z, RR, ZZ):
+def contour_diff(z_ref, z, RR, ZZ):
     l1 = mlines.Line2D([], [], label="DNN")
     l2 = mlines.Line2D([], [], color="black", label="FRIDA")
 
