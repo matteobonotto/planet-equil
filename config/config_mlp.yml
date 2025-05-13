@@ -1,7 +1,7 @@
 is_physics_informed: true
-save_path:  'trained_models/mlp/'
-dataset_path: planet/tests/data/iter_like_data_sample.h5 
-batch_size: 16
+save_path: trained_models/mlp/
+dataset_path: data/iter_like_data.h5
+batch_size: 4092
 epochs: 10
 # log_to_wandb: true
 wandb_project: planet_mlp_test

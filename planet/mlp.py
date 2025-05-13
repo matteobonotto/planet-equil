@@ -10,6 +10,8 @@ from sklearn.preprocessing import StandardScaler
 from dataclasses import dataclass, asdict
 import yaml
 from torchinfo import summary
+import json
+import pickle
 
 from multiprocessing import cpu_count
 from torch import Tensor, nn, autograd
@@ -23,7 +25,12 @@ from lightning.pytorch.loggers import WandbLogger
 
 from torch.utils.data import DataLoader, Subset
 
-from planet.utils import read_h5_numpy, get_accelerator, last_ckp_path, save_model_and_scaler
+from planet.utils import (
+    read_h5_numpy,
+    get_accelerator,
+    last_ckp_path,
+    save_model_and_scaler,
+)
 from planet.constants import RANDOM_SEED
 
 
@@ -123,7 +130,7 @@ class MLPStack(nn.Module):
                 layers.append(LineardNormAct(in_features, out_features))
             elif i == n_layers - 1:
                 in_features, out_features = hidden_dim, out_dim
-                layers.append(nn.Linear(in_features, out_features)) 
+                layers.append(nn.Linear(in_features, out_features))
             else:
                 in_features, out_features = hidden_dim, hidden_dim
                 layers.append(LineardNormAct(in_features, out_features))
@@ -230,11 +237,14 @@ class PlaNetLoss(nn.Module):
         if not self.is_physics_informed:
             return mse_loss
         else:
-            pde_loss = self.scale_pde * self.loss_pde(
-                pred=pred,
-                rhs=rhs,
-                rz=rz,
-            )
+            if rz.requires_grad == False:
+                pde_loss = torch.tensor(0.0).to(pred.device)
+            else:
+                pde_loss = self.scale_pde * self.loss_pde(
+                    pred=pred,
+                    rhs=rhs,
+                    rz=rz,
+                )
             self.log_dict["pde_loss"] = pde_loss.item()
             return mse_loss + pde_loss
 
@@ -342,9 +352,13 @@ class DataModule(L.LightningDataModule):
         self.split_dataset()
 
     def split_dataset(self, ratio: int = 0.1):
-        idx = list(range(len(self.dataset)))
-        idx_valid = random.sample(idx, k=int(ratio * len(idx)))
-        idx_train = list(set(idx).difference(idx_valid))
+        # idx = list(range(len(self.dataset)))
+        # idx_valid = random.sample(idx, k=int(ratio * len(idx)))
+        # idx_train = list(set(idx).difference(idx_valid))
+        idx_valid = list(range(0, int(ratio * len(self.dataset))))
+        idx_train = list(
+            range(int(ratio * len(self.dataset)) + 1, len(self.dataset) - 1)
+        )
         self.train_dataset = Subset(self.dataset, idx_train)
         self.val_dataset = Subset(self.dataset, idx_valid)
 
@@ -409,6 +423,32 @@ class LightningPlaNet(L.LightningModule):
         return torch.optim.AdamW(self.parameters(), lr=0.001)
 
 
+def save_model_and_scaler(
+    trainer: Trainer,
+    scaler_inputs: StandardScaler,
+    scaler_rz: StandardScaler,
+    config: Config,
+) -> None:
+    save_dir = Path(config.save_path).parent
+    save_dir.mkdir(exist_ok=True, parents=True)
+
+    # save model config
+    json.dump(config.planet.to_dict(), open(save_dir / Path("config.json"), "w"))
+
+    # save model
+    planet_model = trainer.model.model
+    planet_model.eval()
+    torch.save(planet_model.state_dict(), save_dir / Path("model.pt"))
+
+    # save scaler_inputs
+    with open(save_dir / Path("scaler_inputs.pkl"), "wb") as f:
+        pickle.dump(scaler_inputs, f)
+
+    # save scaler_rz
+    with open(save_dir / Path("scaler_rz.pkl"), "wb") as f:
+        pickle.dump(scaler_rz, f)
+
+
 def main_train(config: Config):
     #
     save_dir = Path(config.save_path).parent
@@ -451,7 +491,9 @@ def main_train(config: Config):
     )
 
     ### save model + scaler for inference
-    save_model_and_scaler(trainer, datamodule.dataset.scaler, config)
+    save_model_and_scaler(
+        trainer, datamodule.dataset.scaler_inputs, datamodule.dataset.scaler_rz, config
+    )
 
 
 if __name__ == "__main__":

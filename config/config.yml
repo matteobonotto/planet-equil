@@ -2,7 +2,7 @@ is_physics_informed: true
 save_path:  'trained_models/test/'
 dataset_path: planet/tests/data/iter_like_data_sample.h5 
 do_super_resolution: false
-batch_size: 16
+batch_size: 1024
 epochs: 10
 log_to_wandb: true
 wandb_project: planet_test
