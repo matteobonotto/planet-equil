@@ -292,13 +292,15 @@ class PlaNetDataset:
         self.inputs = np.column_stack(
             (data["measures"], data["coils_current"], data["p_profile"])
         )
-        self.inputs = self.scaler_inputs.fit_transform(self.inputs)
+        idx = 10000
+        n_sample = idx
+        self.inputs = self.scaler_inputs.fit_transform(self.inputs)[:idx, ...]
 
         self.map_equil_idx = (
             np.arange(n_sample)[:, None, None] * np.ones((nr, nz), dtype=int)
         ).ravel()
-        self.flux = data["flux"].ravel()
-        self.rhs = data["rhs"].ravel()
+        self.flux = data["flux"][:idx, ...].ravel()
+        self.rhs = data["rhs"][:idx, ...].ravel()
 
         self.rz = np.column_stack(
             [
