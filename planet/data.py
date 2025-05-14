@@ -11,6 +11,7 @@ import h5py
 from scipy.interpolate import RegularGridInterpolator
 
 from .utils import read_h5_numpy
+from .types import _TypeNpFloat
 from .constants import RANDOM_SEED
 
 random.seed(RANDOM_SEED)
@@ -24,7 +25,7 @@ def sample_random_subgrids(
     nr: int,
     nz: int,
     seed: Optional[int],
-) -> Tuple[ndarray, ndarray]:
+) -> Tuple[_TypeNpFloat, _TypeNpFloat]:
     delta_r_min = (RR_max - RR_min) / 3
     delta_r_max = RR_max - RR_min
 
@@ -47,7 +48,7 @@ def sample_random_subgrids(
     return (rr_grid, zz_grid)
 
 
-def get_box_from_grid(rr_grid: ndarray, zz_grid: ndarray) -> ndarray:
+def get_box_from_grid(rr_grid: _TypeNpFloat, zz_grid: _TypeNpFloat) -> _TypeNpFloat:
     return np.array(
         [
             [rr_grid.min(), zz_grid.min()],
@@ -60,8 +61,8 @@ def get_box_from_grid(rr_grid: ndarray, zz_grid: ndarray) -> ndarray:
 
 
 def interp_fun(
-    f: ndarray, RR: ndarray, ZZ: ndarray, rr: ndarray, zz: ndarray
-) -> ndarray:
+    f: _TypeNpFloat, RR: _TypeNpFloat, ZZ: _TypeNpFloat, rr: _TypeNpFloat, zz: _TypeNpFloat
+) -> _TypeNpFloat:
     x_pts = RR[0, :].ravel()
     y_pts = ZZ[:, 0].ravel()
     interp_func = RegularGridInterpolator((x_pts, y_pts), f.T)
@@ -77,7 +78,7 @@ def interp_fun(
     return f_int
 
 
-def compute_Grda_Shafranov_kernels(RR: ndarray, ZZ: ndarray) -> Tuple[ndarray, ndarray]:
+def compute_Grda_Shafranov_kernels(RR: _TypeNpFloat, ZZ: _TypeNpFloat) -> Tuple[_TypeNpFloat, _TypeNpFloat]:
     hr = RR[1, 2] - RR[1, 1]
     hz = ZZ[2, 1] - ZZ[1, 1]
     alfa = -2 * (hr**2 + hz**2)
@@ -116,6 +117,20 @@ def get_device() -> torch.device:
         return torch.device("cpu")
 
 
+class Scaler:
+    def __init__(self) -> None:
+        self.scaler = StandardScaler()
+    
+    def fit(self, x: _TypeNpFloat) -> _TypeNpFloat:
+        return self.scaler.fit(x)
+    
+    def transform(self, x: _TypeNpFloat) -> _TypeNpFloat:
+        return self.scaler.transform(x)
+    
+    def fit_transform(self, x: _TypeNpFloat) -> _TypeNpFloat:
+        return self.scaler.fit_transform(x)
+
+
 class PlaNetDataset:
     def __init__(
         self,
@@ -125,10 +140,10 @@ class PlaNetDataset:
         nr: int = 64,
         nz: int = 64,
         do_super_resolution: bool = False,
-    ):
+    ) -> None:
         self.dtype = dtype
         self.device = get_device()
-        self.scaler = StandardScaler()
+        self.scaler = Scaler()
         self.is_physics_informed = is_physics_informed
         self.nr = nr
         self.nz = nz
@@ -163,7 +178,7 @@ class PlaNetDataset:
             seed=RANDOM_SEED,
         )
 
-    def get_scaler(self) -> StandardScaler:
+    def get_scaler(self) -> Scaler:
         return self.scaler
 
     def __len__(self) -> int:

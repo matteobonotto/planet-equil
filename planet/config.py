@@ -5,10 +5,10 @@ from typing import Dict, Any, Optional
 
 @dataclass
 class PlaNetConfig:
-    hidden_dim: int = (128,)
-    nr: int = (64,)
-    nz: int = (64,)
-    branch_in_dim: int = (302,)
+    hidden_dim: int = 128
+    nr: int = 64
+    nz: int = 64
+    branch_in_dim: int = 302
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -45,6 +45,7 @@ class Config:
                 setattr(cls_instance, k, v)
 
         if hasattr(cls_instance, "planet"):
+            assert cls_instance.planet is not None, "must provide valid config.planet, got None"
             cls_instance.planet = PlaNetConfig(**cls_instance.planet)
 
         return cls_instance

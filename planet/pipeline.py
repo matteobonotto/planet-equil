@@ -1,19 +1,21 @@
 from __future__ import annotations
 from sklearn.preprocessing import StandardScaler
-from typing import Tuple
+from typing import Tuple, TypeAlias
 import torch
 from torch import Tensor
 import json
 from pathlib import Path
 import pickle
 import numpy as np
-from numpy import ndarray
+from numpy.typing import NDArray
+
 from scipy import signal
 
 from .model import PlaNetCore
 from .config import PlaNetConfig
 from .data import compute_Grda_Shafranov_kernels
 from .loss import Gauss_kernel_5x5
+from .types import _TypeNpFloat
 
 
 class PlaNet:
@@ -23,7 +25,7 @@ class PlaNet:
         self.model.eval()
         self.scaler: StandardScaler = scaler
 
-    def set_device_and_dtype(self):
+    def set_device_and_dtype(self) -> None:
         _, param = next(iter(self.model.named_parameters()))
         self.device = param.device
         self.dtype = param.dtype
@@ -44,18 +46,18 @@ class PlaNet:
         return cls(model, scaler)
 
     def _np_to_tensor(
-        self, inputs_np: Tuple[ndarray], device: torch.device, dtype: torch.dtype
+        self, inputs_np: Tuple[_TypeNpFloat, _TypeNpFloat, _TypeNpFloat], device: torch.device, dtype: torch.dtype
     ) -> Tuple[Tensor]:
         return tuple(Tensor(x).to(device).to(dtype) for x in inputs_np)
 
     def __call__(
         self,
-        measures: ndarray,
-        coils_current: ndarray,
-        profile: ndarray,
-        rr: ndarray,
-        zz: ndarray,
-    ) -> ndarray:
+        measures: _TypeNpFloat,
+        coils_current: _TypeNpFloat,
+        profile: _TypeNpFloat,
+        rr: _TypeNpFloat,
+        zz: _TypeNpFloat,
+    ) -> _TypeNpFloat:
 
         # prepare the inputs [simulating batch size of 1]
         equil_inputs = np.column_stack(
@@ -79,7 +81,7 @@ class PlaNet:
 
         return flux.numpy().astype(measures.dtype)
 
-    def compute_gs_operator(self, flux: ndarray, rr: ndarray, zz: ndarray) -> ndarray:
+    def compute_gs_operator(self, flux: _TypeNpFloat, rr: _TypeNpFloat, zz: _TypeNpFloat) -> _TypeNpFloat:
         L_ker, Df_dr_ker = compute_Grda_Shafranov_kernels(rr, zz)
         hr = rr[1, 2] - rr[1, 1]
         hz = zz[2, 1] - zz[1, 1]

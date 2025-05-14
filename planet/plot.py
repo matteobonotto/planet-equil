@@ -1,27 +1,26 @@
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 
+from .types import _TypeNpFloat
 
-def contourf(z, RR, ZZ, title: str = ""):
+def contourf(z:_TypeNpFloat, RR:_TypeNpFloat, ZZ:_TypeNpFloat, title: str = ""):
     plt.figure()
     plt.contourf(RR, ZZ, z, 20)
     plt.axis("equal")
     plt.colorbar()
     plt.title(title)
     plt.show()
-    return
 
 
-def contour(z, RR, ZZ):
+def contour(z:_TypeNpFloat, RR:_TypeNpFloat, ZZ:_TypeNpFloat):
     plt.figure()
     plt.contour(RR, ZZ, z, 20)
     plt.axis("equal")
     plt.colorbar()
     plt.show()
-    return
 
 
-def contour_diff(z_ref, z, RR, ZZ):
+def contour_diff(z_ref:_TypeNpFloat, z:_TypeNpFloat, RR:_TypeNpFloat, ZZ:_TypeNpFloat) -> None:
     l1 = mlines.Line2D([], [], label="DNN")
     l2 = mlines.Line2D([], [], color="black", label="FRIDA")
 
@@ -32,4 +31,3 @@ def contour_diff(z_ref, z, RR, ZZ):
     plt.legend(handles=[l1, l2])
     plt.axis("equal")
     plt.show()
-    return

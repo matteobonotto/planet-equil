@@ -72,7 +72,7 @@ def _compute_grad_shafranov_operator(
 
 
 class GSOperatorLoss(nn.Module):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.mse = nn.MSELoss()
         self.register_buffer(

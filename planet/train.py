@@ -1,9 +1,10 @@
-from typing import List, Tuple
+from typing import List, Tuple, Any, Optional
 import random
 import torch
 from pathlib import Path
 from torch import Tensor
 import lightning as L
+import torch.optim.optimizer
 from torch.utils.data import DataLoader, Subset
 from multiprocessing import cpu_count
 
@@ -18,7 +19,7 @@ from .data import PlaNetDataset, get_device
 from .utils import get_accelerator, last_ckp_path, save_model_and_scaler
 
 
-def collate_fun(batch: Tuple[Tuple[Tensor]]) -> Tuple[Tensor]:
+def collate_fun(batch: Tuple[Tuple[Tensor,Tensor,Tensor,Tensor,Tensor,Tensor,Tensor]]) -> Tuple[Tensor]:
     return (
         torch.stack([s[0] for s in batch], dim=0),  # measures
         torch.stack([s[1] for s in batch], dim=0),  # flux
@@ -33,6 +34,7 @@ def collate_fun(batch: Tuple[Tuple[Tensor]]) -> Tuple[Tensor]:
 class DataModule(L.LightningDataModule):
     def __init__(self, config: Config):
         super().__init__()
+        assert config.planet is not None, "must provide valid config.planet, got None"
         self.dataset = PlaNetDataset(
             path=config.dataset_path,
             is_physics_informed=config.is_physics_informed,
@@ -46,14 +48,14 @@ class DataModule(L.LightningDataModule):
         )
         self.split_dataset()
 
-    def split_dataset(self, ratio: int = 0.1):
+    def split_dataset(self, ratio: float = 0.1) -> None:
         idx = list(range(len(self.dataset)))
         idx_valid = random.sample(idx, k=int(ratio * len(idx)))
         idx_train = list(set(idx).difference(idx_valid))
         self.train_dataset = Subset(self.dataset, idx_train)
         self.val_dataset = Subset(self.dataset, idx_valid)
 
-    def train_dataloader(self):
+    def train_dataloader(self) -> DataLoader:
         return DataLoader(
             dataset=self.train_dataset,
             batch_size=self.batch_size,
@@ -63,7 +65,7 @@ class DataModule(L.LightningDataModule):
             persistent_workers=True if self.num_workers > 0 else False,
         )
 
-    def val_dataloader(self):
+    def val_dataloader(self) -> DataLoader:
         return DataLoader(
             dataset=self.val_dataset,
             batch_size=self.batch_size,
@@ -73,17 +75,21 @@ class DataModule(L.LightningDataModule):
             persistent_workers=True if self.num_workers > 0 else False,
         )
 
-    def setup(self, stage=None):
+    def setup(self, stage: Optional[any]=None) -> None:
         pass
 
 
 class LightningPlaNet(L.LightningModule):
     def __init__(self, config: Config):
         super().__init__()
+        assert config.planet is not None, "must provide valid config.planet, got None"
         self.model = PlaNetCore(**config.planet.to_dict())
         self.loss_module = PlaNetLoss(is_physics_informed=config.is_physics_informed)
 
-    def _compute_loss_batch(self, batch, batch_idx):
+    def forward(self, *args: Any) -> Tensor:
+        return self.model(*args)
+
+    def _compute_loss_batch(self, batch:Tensor, batch_idx:int) ->Tensor:
         measures, flux, rhs, RR, ZZ, L_ker, Df_ker = batch
         pred = self((measures, RR, ZZ))
         loss = self.loss_module(
@@ -97,10 +103,7 @@ class LightningPlaNet(L.LightningModule):
         )
         return loss
 
-    def forward(self, *args):
-        return self.model(*args)
-
-    def training_step(self, batch, batch_idx):
+    def training_step(self, batch:Tensor, batch_idx:int) -> Tensor:
         loss = self._compute_loss_batch(batch, batch_idx)
         self.log("train_loss", loss, prog_bar=True)
         # self.logger.log_metrics({'train_'+k:v for k,v in self.loss_module.log_dict.items()})
@@ -108,12 +111,12 @@ class LightningPlaNet(L.LightningModule):
             self.log(f"train_{k}", v, prog_bar=False)
         return loss
 
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch:Tensor, batch_idx:int) -> Tensor:
         loss = self._compute_loss_batch(batch, batch_idx)
         self.log("val_loss", loss, prog_bar=True)
         return loss
 
-    def configure_optimizers(self):
+    def configure_optimizers(self) -> torch.optim.Optimizer:
         return torch.optim.AdamW(self.parameters(), lr=0.001)
 
 

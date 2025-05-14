@@ -1,4 +1,4 @@
-from planet.data import write_h5, read_h5_numpy, PlaNetDataset
+from planet.utils import read_h5_numpy, write_h5
 
 if __name__ == "__main__":
 
@@ -52,18 +52,18 @@ if __name__ == "__main__":
     data = read_h5_numpy(filename="iter_like_data.h5")
     t1 = time.time() - t0
 
-    # create the dataset with the equilibria on the full grid
-    import tensorflow as tf
+    # # create the dataset with the equilibria on the full grid
+    # import tensorflow as tf
 
-    ds = tf.data.Dataset.load(
-        "/Users/matte/Library/CloudStorage/GoogleDrive-matteobonotto90@gmail.com/My Drive/Colab_Notebooks/PlaNet/tf_Datasets/tf_Dataset_NeuralOpt_all_domain_only_32x32.data"
-    )
+    # ds = tf.data.Dataset.load(
+    #     "/Users/matte/Library/CloudStorage/GoogleDrive-matteobonotto90@gmail.com/My Drive/Colab_Notebooks/PlaNet/tf_Datasets/tf_Dataset_NeuralOpt_all_domain_only_32x32.data"
+    # )
 
-    measures, flux, rhs, RR, ZZ, L_ker, Df_ker = next(iter(ds))
-    batch_size = measures.shape[0]
+    # measures, flux, rhs, RR, ZZ, L_ker, Df_ker = next(iter(ds))
+    # batch_size = measures.shape[0]
 
-    RR = RR[0, ...].numpy()
-    ZZ = ZZ[0, ...].numpy()
+    # RR = RR[0, ...].numpy()
+    # ZZ = ZZ[0, ...].numpy()
 
     # measures = np.zeros((len(ds)*measures.shape[0], *measures.shape[1:]))
     # flux = np.zeros((len(ds)*flux.shape[0], *flux.shape[1:]))
@@ -102,6 +102,3 @@ if __name__ == "__main__":
     # )
     # data = read_h5_numpy(filename="planet_data.h5")
 
-    dataset = PlaNetDataset(path="planet_data_sample.h5")
-
-    (measures, flux, rhs, RR, ZZ, L_ker, Df_ker) = dataset[0]

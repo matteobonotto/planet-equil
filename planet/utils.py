@@ -25,14 +25,16 @@ def load_config(path: str) -> Config:
     return Config.from_dict(config_dict=config_dict)
 
 
-def last_ckp_path(ckpt_path: str) -> Path:
+def last_ckp_path(ckpt_path: str | Path) -> Path:
+    if isinstance(ckpt_path, str):
+        ckpt_path = Path(ckpt_path)
     # for ckp in Path(ckpt_path).iterdir():
     # Regex to extract epoch and step
     pattern = re.compile(r"epoch=(\d+)-step=(\d+)")
 
     # Extract (epoch, step) tuples + path
     parsed = []
-    for path in Path(ckpt_path).iterdir():
+    for path in ckpt_path.iterdir():
         match = pattern.search(path.name)
         if match:
             epoch, step = map(int, match.groups())
@@ -68,7 +70,7 @@ def get_accelerator() -> Optional[str]:
     elif torch.cuda.is_available():
         return "cuda"
     else:
-        return None
+        return "auto"
 
 
 def write_h5(
