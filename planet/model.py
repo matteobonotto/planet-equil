@@ -25,7 +25,7 @@ class TrainableSwish(nn.Module):
         return swish(x, self.beta)
 
 
-def swish(x: Tensor, beta: nn.Parameter = 1.0) -> Tensor:
+def swish(x: Tensor, beta: nn.Parameter) -> Tensor:
     return x * F.sigmoid(beta * x)
 
 

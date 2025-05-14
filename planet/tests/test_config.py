@@ -10,10 +10,7 @@ def test_config():
     config = Config.from_dict(cfg)
 
     #
-    config = PlaNetConfig(
-        batch_size=128,
-        branch_in_dim=10000,
-    )
+    config = PlaNetConfig(**config.planet.to_dict())
 
 
 test_config()

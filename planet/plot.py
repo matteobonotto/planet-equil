@@ -3,7 +3,10 @@ import matplotlib.lines as mlines
 
 from .types import _TypeNpFloat
 
-def contourf(z:_TypeNpFloat, RR:_TypeNpFloat, ZZ:_TypeNpFloat, title: str = ""):
+
+def contourf(
+    z: _TypeNpFloat, RR: _TypeNpFloat, ZZ: _TypeNpFloat, title: str = ""
+) -> None:
     plt.figure()
     plt.contourf(RR, ZZ, z, 20)
     plt.axis("equal")
@@ -12,7 +15,7 @@ def contourf(z:_TypeNpFloat, RR:_TypeNpFloat, ZZ:_TypeNpFloat, title: str = ""):
     plt.show()
 
 
-def contour(z:_TypeNpFloat, RR:_TypeNpFloat, ZZ:_TypeNpFloat):
+def contour(z: _TypeNpFloat, RR: _TypeNpFloat, ZZ: _TypeNpFloat) -> None:
     plt.figure()
     plt.contour(RR, ZZ, z, 20)
     plt.axis("equal")
@@ -20,7 +23,9 @@ def contour(z:_TypeNpFloat, RR:_TypeNpFloat, ZZ:_TypeNpFloat):
     plt.show()
 
 
-def contour_diff(z_ref:_TypeNpFloat, z:_TypeNpFloat, RR:_TypeNpFloat, ZZ:_TypeNpFloat) -> None:
+def contour_diff(
+    z_ref: _TypeNpFloat, z: _TypeNpFloat, RR: _TypeNpFloat, ZZ: _TypeNpFloat
+) -> None:
     l1 = mlines.Line2D([], [], label="DNN")
     l2 = mlines.Line2D([], [], color="black", label="FRIDA")
 

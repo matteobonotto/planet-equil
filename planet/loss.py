@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Type
 import torch
 from torch import Tensor, nn
 import numpy as np
@@ -72,6 +72,8 @@ def _compute_grad_shafranov_operator(
 
 
 class GSOperatorLoss(nn.Module):
+    Gauss_kernel: Tensor
+
     def __init__(self) -> None:
         super().__init__()
         self.mse = nn.MSELoss()
@@ -94,7 +96,7 @@ class GSOperatorLoss(nn.Module):
         return self.mse(rhs_computed, rhs)
 
 
-MAP_PDELOSS: Dict[str, nn.Module] = {"grad_shafranov_operator": GSOperatorLoss}
+MAP_PDELOSS: Dict[str, Type[nn.Module]] = {"grad_shafranov_operator": GSOperatorLoss}
 
 
 class PlaNetLoss(nn.Module):

@@ -9,7 +9,7 @@ wandb_project: planet_test
 save_checkpoints: true
 resume_from_checkpoint: false
 num_workers: 0
-planet:
+planet_config:
   hidden_dim: 128
   nr: 64
   nz: 64

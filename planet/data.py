@@ -4,6 +4,7 @@ from numpy import ndarray
 from functools import partial
 from typing import Optional, Tuple, Any, List
 import torch
+from torch.utils.data import Dataset
 from torch import Tensor
 from sklearn.preprocessing import StandardScaler
 
@@ -61,7 +62,11 @@ def get_box_from_grid(rr_grid: _TypeNpFloat, zz_grid: _TypeNpFloat) -> _TypeNpFl
 
 
 def interp_fun(
-    f: _TypeNpFloat, RR: _TypeNpFloat, ZZ: _TypeNpFloat, rr: _TypeNpFloat, zz: _TypeNpFloat
+    f: _TypeNpFloat,
+    RR: _TypeNpFloat,
+    ZZ: _TypeNpFloat,
+    rr: _TypeNpFloat,
+    zz: _TypeNpFloat,
 ) -> _TypeNpFloat:
     x_pts = RR[0, :].ravel()
     y_pts = ZZ[:, 0].ravel()
@@ -78,7 +83,9 @@ def interp_fun(
     return f_int
 
 
-def compute_Grda_Shafranov_kernels(RR: _TypeNpFloat, ZZ: _TypeNpFloat) -> Tuple[_TypeNpFloat, _TypeNpFloat]:
+def compute_Grda_Shafranov_kernels(
+    RR: _TypeNpFloat, ZZ: _TypeNpFloat
+) -> Tuple[_TypeNpFloat, _TypeNpFloat]:
     hr = RR[1, 2] - RR[1, 1]
     hz = ZZ[2, 1] - ZZ[1, 1]
     alfa = -2 * (hr**2 + hz**2)
@@ -94,8 +101,8 @@ def compute_Grda_Shafranov_kernels(RR: _TypeNpFloat, ZZ: _TypeNpFloat) -> Tuple[
 
 
 def _to_tensor(
-    device: torch.device, inputs: Tuple[Any], dtype: torch.dtype
-) -> Tuple[Tensor]:
+    device: torch.device, inputs: List[Any], dtype: torch.dtype
+) -> List[Tensor]:
     inputs_t: List[Tensor] = []
     for x in inputs:
         inputs_t.append(
@@ -105,7 +112,7 @@ def _to_tensor(
                 # device=device,
             )
         )
-    return tuple(inputs_t)
+    return inputs_t
 
 
 def get_device() -> torch.device:
@@ -120,18 +127,18 @@ def get_device() -> torch.device:
 class Scaler:
     def __init__(self) -> None:
         self.scaler = StandardScaler()
-    
+
     def fit(self, x: _TypeNpFloat) -> _TypeNpFloat:
         return self.scaler.fit(x)
-    
+
     def transform(self, x: _TypeNpFloat) -> _TypeNpFloat:
         return self.scaler.transform(x)
-    
+
     def fit_transform(self, x: _TypeNpFloat) -> _TypeNpFloat:
         return self.scaler.fit_transform(x)
 
 
-class PlaNetDataset:
+class PlaNetDataset(Dataset):  # type: ignore[type-arg]
     def __init__(
         self,
         path: str,
@@ -184,7 +191,7 @@ class PlaNetDataset:
     def __len__(self) -> int:
         return self.inputs.shape[0]
 
-    def __getitem__(self, idx: int) -> Tuple[Tensor]:
+    def __getitem__(self, idx: int) -> List[Tensor]:
         inputs = self.inputs[idx, ...]
         flux = self.flux[idx, ...]
         rhs = self.rhs[idx, ...]
@@ -223,5 +230,5 @@ class PlaNetDataset:
         return _to_tensor(
             device=self.device,
             dtype=self.dtype,
-            inputs=(inputs, flux, rhs, RR, ZZ, L_ker, Df_ker),
+            inputs=[inputs, flux, rhs, RR, ZZ, L_ker, Df_ker],
         )

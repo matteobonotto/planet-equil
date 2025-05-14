@@ -1,9 +1,10 @@
 from argparse import ArgumentParser, Namespace
-from typing import Optional
-import yaml
+from typing import Optional, Dict, Any
+import yaml  # type: ignore
 from pathlib import Path
 import re
 import torch
+from torch import nn
 import pickle
 from lightning import Trainer
 import json
@@ -55,6 +56,8 @@ def save_model_and_scaler(
     json.dump(config.planet.to_dict(), open(save_dir / Path("config.json"), "w"))
 
     # save model
+    assert trainer.model is not None, "Trainer.model is None — can't save it"
+    assert isinstance(trainer.model.model, nn.Module), "Expected nn.Module"
     planet_model = trainer.model.model
     planet_model.eval()
     torch.save(planet_model.state_dict(), save_dir / Path("model.pt"))
@@ -64,7 +67,7 @@ def save_model_and_scaler(
         pickle.dump(scaler, f)
 
 
-def get_accelerator() -> Optional[str]:
+def get_accelerator() -> str:
     if torch.backends.mps.is_available():
         return "mps"
     elif torch.cuda.is_available():
@@ -74,16 +77,16 @@ def get_accelerator() -> Optional[str]:
 
 
 def write_h5(
-    data: dict,
+    data: Dict[str, Any],
     filename: str,
     dtype: str = "float64",
     # compression : str = 'lzf',
     # compression_opts : int = 1,
     # verbose : bool = False,
-):
+) -> None:
 
-    compression: str = "lzf"
-    compression: int = 1
+    # compression: str = "lzf"
+    compression: int = 1  # -> gzip compression level
 
     kwargs = {
         "dtype": dtype,
@@ -99,8 +102,8 @@ def write_h5(
 
 def read_h5_numpy(
     filename: str,
-):
-    data = {}
+) -> Dict[str, Any]:
+    data: Dict[str, Any] = {}
     with h5py.File(filename, "r") as hf:
         for key, item in hf.items():
             data.update({key: item[()]})

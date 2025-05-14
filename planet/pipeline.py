@@ -1,6 +1,6 @@
 from __future__ import annotations
 from sklearn.preprocessing import StandardScaler
-from typing import Tuple, TypeAlias
+from typing import Tuple, TypeAlias, List
 import torch
 from torch import Tensor
 import json
@@ -32,23 +32,23 @@ class PlaNet:
 
     @classmethod
     def from_pretrained(cls, path: str) -> PlaNet:
-        path = Path(path)
+        model_path = Path(path)
 
         # load model config
-        config = PlaNetConfig(**json.load(open(path / Path("config.json"), "r")))
+        config = PlaNetConfig(**json.load(open(model_path / Path("config.json"), "r")))
 
         # load scaler (already fitted during training)
-        scaler = pickle.load(open(path / Path("scaler.pkl"), "rb"))
+        scaler = pickle.load(open(model_path / Path("scaler.pkl"), "rb"))
 
         # load the core planet model
         model = PlaNetCore(**config.to_dict())
-        model.load_state_dict(torch.load(path / Path("model.pt")))
+        model.load_state_dict(torch.load(model_path / Path("model.pt")))
         return cls(model, scaler)
 
     def _np_to_tensor(
-        self, inputs_np: Tuple[_TypeNpFloat, _TypeNpFloat, _TypeNpFloat], device: torch.device, dtype: torch.dtype
-    ) -> Tuple[Tensor]:
-        return tuple(Tensor(x).to(device).to(dtype) for x in inputs_np)
+        self, inputs_np: List[_TypeNpFloat], device: torch.device, dtype: torch.dtype
+    ) -> List[Tensor]:
+        return [Tensor(x).to(device).to(dtype) for x in inputs_np]
 
     def __call__(
         self,
@@ -60,20 +60,19 @@ class PlaNet:
     ) -> _TypeNpFloat:
 
         # prepare the inputs [simulating batch size of 1]
-        equil_inputs = np.column_stack(
+        equil_inputs: _TypeNpFloat = np.column_stack(
             (measures[None, :], coils_current[None, :], profile[None, :]),
         )
         scaled_inputs = self.scaler.transform(equil_inputs)
 
         # perfrom the forward pass
+        inputs = self._np_to_tensor(
+            [scaled_inputs, rr[None, :], zz[None, :]],
+            device=self.device,
+            dtype=self.dtype,
+        )
         with torch.inference_mode():
-            flux = self.model(
-                self._np_to_tensor(
-                    (scaled_inputs, rr[None, :], zz[None, :]),
-                    device=self.device,
-                    dtype=self.dtype,
-                )
-            )
+            flux = self.model(*inputs)
 
         # go back to np array (with the correct dtype and device)
         if self.device != torch.device("cpu"):
@@ -81,7 +80,9 @@ class PlaNet:
 
         return flux.numpy().astype(measures.dtype)
 
-    def compute_gs_operator(self, flux: _TypeNpFloat, rr: _TypeNpFloat, zz: _TypeNpFloat) -> _TypeNpFloat:
+    def compute_gs_operator(
+        self, flux: _TypeNpFloat, rr: _TypeNpFloat, zz: _TypeNpFloat
+    ) -> _TypeNpFloat:
         L_ker, Df_dr_ker = compute_Grda_Shafranov_kernels(rr, zz)
         hr = rr[1, 2] - rr[1, 1]
         hz = zz[2, 1] - zz[1, 1]

@@ -2,7 +2,7 @@
 
 is_physics_informed: True
 dataset_path: 'planet/tests/data/iter_like_data_sample.h5'
-batch_size: 640
+batch_size: 4
 epochs: 1000
 hidden_dim: 1280
 planet:

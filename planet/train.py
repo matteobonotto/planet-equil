@@ -1,26 +1,29 @@
-from typing import List, Tuple, Any, Optional
+from typing import List, Tuple, Any, Optional, Dict
 import random
 import torch
 from pathlib import Path
-from torch import Tensor
-import lightning as L
-import torch.optim.optimizer
 from torch.utils.data import DataLoader, Subset
 from multiprocessing import cpu_count
 
+from torch import Tensor
+from torch.optim import Optimizer
+
+import lightning as L
 from lightning import Trainer
 from lightning.pytorch.callbacks import ModelCheckpoint, Callback
 from lightning.pytorch.loggers import WandbLogger
+from lightning.pytorch.utilities.types import LRSchedulerConfig
 
 from .config import Config
 from .model import PlaNetCore
 from .loss import PlaNetLoss
 from .data import PlaNetDataset, get_device
 from .utils import get_accelerator, last_ckp_path, save_model_and_scaler
+from .types import _TypeBatch
 
 
-def collate_fun(batch: Tuple[Tuple[Tensor,Tensor,Tensor,Tensor,Tensor,Tensor,Tensor]]) -> Tuple[Tensor]:
-    return (
+def collate_fun(batch: _TypeBatch) -> List[Tensor]:
+    return [
         torch.stack([s[0] for s in batch], dim=0),  # measures
         torch.stack([s[1] for s in batch], dim=0),  # flux
         torch.stack([s[2] for s in batch], dim=0),  # rhs
@@ -28,7 +31,7 @@ def collate_fun(batch: Tuple[Tuple[Tensor,Tensor,Tensor,Tensor,Tensor,Tensor,Ten
         torch.stack([s[4] for s in batch], dim=0),  # ZZ
         torch.stack([s[5] for s in batch], dim=0),  # L_ker
         torch.stack([s[6] for s in batch], dim=0),  # Dr_ker
-    )
+    ]
 
 
 class DataModule(L.LightningDataModule):
@@ -55,7 +58,7 @@ class DataModule(L.LightningDataModule):
         self.train_dataset = Subset(self.dataset, idx_train)
         self.val_dataset = Subset(self.dataset, idx_valid)
 
-    def train_dataloader(self) -> DataLoader:
+    def train_dataloader(self) -> DataLoader[Any]:
         return DataLoader(
             dataset=self.train_dataset,
             batch_size=self.batch_size,
@@ -65,7 +68,7 @@ class DataModule(L.LightningDataModule):
             persistent_workers=True if self.num_workers > 0 else False,
         )
 
-    def val_dataloader(self) -> DataLoader:
+    def val_dataloader(self) -> DataLoader[Any]:
         return DataLoader(
             dataset=self.val_dataset,
             batch_size=self.batch_size,
@@ -75,7 +78,7 @@ class DataModule(L.LightningDataModule):
             persistent_workers=True if self.num_workers > 0 else False,
         )
 
-    def setup(self, stage: Optional[any]=None) -> None:
+    def setup(self, stage: Optional[Any] = None) -> None:
         pass
 
 
@@ -89,7 +92,7 @@ class LightningPlaNet(L.LightningModule):
     def forward(self, *args: Any) -> Tensor:
         return self.model(*args)
 
-    def _compute_loss_batch(self, batch:Tensor, batch_idx:int) ->Tensor:
+    def _compute_loss_batch(self, batch: Tensor, batch_idx: int) -> Tensor:
         measures, flux, rhs, RR, ZZ, L_ker, Df_ker = batch
         pred = self((measures, RR, ZZ))
         loss = self.loss_module(
@@ -103,7 +106,7 @@ class LightningPlaNet(L.LightningModule):
         )
         return loss
 
-    def training_step(self, batch:Tensor, batch_idx:int) -> Tensor:
+    def training_step(self, batch: Tensor, batch_idx: int) -> Tensor:
         loss = self._compute_loss_batch(batch, batch_idx)
         self.log("train_loss", loss, prog_bar=True)
         # self.logger.log_metrics({'train_'+k:v for k,v in self.loss_module.log_dict.items()})
@@ -111,16 +114,30 @@ class LightningPlaNet(L.LightningModule):
             self.log(f"train_{k}", v, prog_bar=False)
         return loss
 
-    def validation_step(self, batch:Tensor, batch_idx:int) -> Tensor:
+    def validation_step(self, batch: Tensor, batch_idx: int) -> Tensor:
         loss = self._compute_loss_batch(batch, batch_idx)
         self.log("val_loss", loss, prog_bar=True)
         return loss
 
-    def configure_optimizers(self) -> torch.optim.Optimizer:
-        return torch.optim.AdamW(self.parameters(), lr=0.001)
+    def configure_optimizers(self) -> Tuple[List[Optimizer], List[LRSchedulerConfig]]:
+        optimizer = torch.optim.AdamW(self.parameters(), lr=1e-3)
+        scheduler = torch.optim.lr_scheduler.LinearLR(
+            optimizer,
+            start_factor=1.0,
+            end_factor=0.02,
+            total_iters=(
+                5 if self.trainer.max_epochs is None else self.trainer.max_epochs
+            ),
+        )
+        scheduler_config = LRSchedulerConfig(
+            scheduler=scheduler,
+            interval="epoch",
+            frequency=1,
+        )
+        return [optimizer], [scheduler_config]
 
 
-def main_train(config: Config):
+def main_train(config: Config) -> None:
     #
     save_dir = Path(config.save_path).parent
     save_dir.mkdir(exist_ok=True, parents=True)

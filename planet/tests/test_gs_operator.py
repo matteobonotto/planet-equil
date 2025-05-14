@@ -7,7 +7,7 @@ import torch
 from scipy import signal
 import numpy as np
 
-from planet.loss import _compute_grad_shafranov_operator, Gauss_kernel
+from planet.loss import _compute_grad_shafranov_operator, Gauss_kernel_5x5
 from planet.train import DataModule
 from planet.config import PlaNetConfig
 from planet.utils import load_config
@@ -20,7 +20,7 @@ def test_gs_operator():
     meas, flux, RHS_in, RR, ZZ, Laplace_kernel, Df_dr_kernel = next(iter(dataloader))
 
     ###
-    gauss_kernel = torch.tensor(Gauss_kernel, dtype=torch.float32)
+    gauss_kernel = torch.tensor(Gauss_kernel_5x5, dtype=torch.float32)
     rhs_computed = _compute_grad_shafranov_operator(
         flux, Laplace_kernel, Df_dr_kernel, RR, ZZ, gauss_kernel
     )

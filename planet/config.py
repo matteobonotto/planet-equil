@@ -1,5 +1,5 @@
 from __future__ import annotations
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from typing import Dict, Any, Optional
 
 
@@ -17,14 +17,11 @@ class PlaNetConfig:
 @dataclass
 class Config:
     is_physics_informed: bool = True
-    dataset_path: Optional[str] = None
+    dataset_path: str = ""
     batch_size: int = 64
     epochs: int = 10
-    # hidden_dim: int = 128
-    # nr: int = 64
-    # nz: int = 64
-    # branch_in_dim: int = 302
-    planet: Optional[PlaNetConfig] = None
+    planet_config: Dict[str, int] = field(default_factory=dict)
+    planet: PlaNetConfig = field(default_factory=PlaNetConfig)
     log_to_wandb: bool = False
     wandb_project: Optional[str] = None
     save_checkpoints: bool = False
@@ -45,7 +42,9 @@ class Config:
                 setattr(cls_instance, k, v)
 
         if hasattr(cls_instance, "planet"):
-            assert cls_instance.planet is not None, "must provide valid config.planet, got None"
-            cls_instance.planet = PlaNetConfig(**cls_instance.planet)
+            assert (
+                cls_instance.planet is not None
+            ), "must provide valid config.planet, got None"
+            cls_instance.planet = PlaNetConfig(**cls_instance.planet_config)
 
         return cls_instance

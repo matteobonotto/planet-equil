@@ -13,7 +13,7 @@ def test_planet_dataset():
     assert hasattr(ds, "inputs")
 
     data = ds[0]
-    assert isinstance(data, tuple)
+    assert isinstance(data, list)
 
     for x in data:
         assert isinstance(x, Tensor)
