@@ -5,14 +5,12 @@ from pathlib import Path
 from torch.utils.data import DataLoader, Subset
 from multiprocessing import cpu_count
 
-from torch import Tensor
-from torch.optim import Optimizer
+from torch import Tensor, nn
 
 import lightning as L
 from lightning import Trainer
 from lightning.pytorch.callbacks import ModelCheckpoint, Callback, TQDMProgressBar
 from lightning.pytorch.loggers import WandbLogger, Logger
-from lightning.pytorch.utilities.types import LRSchedulerConfig, OptimizerLRScheduler
 
 from .config import Config
 from .model import PlaNetCore
@@ -114,12 +112,12 @@ class LightningPlaNet(L.LightningModule):
         )
         return loss
 
-    def on_train_batch_end(self, outputs, batch, batch_idx):
+    def on_train_batch_end(self, outputs: Any, batch: Any, batch_idx: int) -> None:
         self._log_lr()
 
-    def _log_lr(self):
+    def _log_lr(self) -> None:
         optimizer = self.optimizers()
-        lr = optimizer.param_groups[0]["lr"]
+        lr = optimizer.param_groups[0]["lr"]  # type: ignore
         self.log("lr", lr, on_step=True, on_epoch=False)
 
     def validation_step(self, batch: Tensor, batch_idx: int) -> Tensor:
@@ -137,13 +135,18 @@ class LightningPlaNet(L.LightningModule):
                 5 if self.trainer.max_epochs is None else self.trainer.max_epochs
             ),
         )
-        # optimizer_lrscheduler_config = LRSchedulerConfig(
-        #     scheduler=scheduler,
-        #     interval="epoch",
-        #     frequency=1,
-        # )
-        # return [optimizer_lrscheduler_config]
         return [optimizer], [{"scheduler": scheduler, "interval": "epoch"}]
+
+
+def get_best_model(config: Config) -> nn.Module:
+    best_ckpt_path = last_ckp_path(config.save_path / Path("ckp"))
+    print(f"Loading best model from checkpoint: {best_ckpt_path}")
+    lightning_planet = LightningPlaNet.load_from_checkpoint(
+        best_ckpt_path, config=config
+    )
+    model = lightning_planet
+    model.to(torch.device("cpu"))
+    return model
 
 
 def main_train(config: Config) -> None:
@@ -188,4 +191,10 @@ def main_train(config: Config) -> None:
     )
 
     ### save model + scaler for inference
-    save_model_and_scaler(trainer, datamodule.dataset.scaler, config)
+    try:
+        # get the model from the best saved checkpoint
+        model = get_best_model(config=config)
+    except:
+        # is something fails, get the model from the trainer
+        model = trainer.model.model.to(torch.device("cpu"))
+    save_model_and_scaler(model, datamodule.dataset.scaler, config)

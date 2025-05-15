@@ -88,4 +88,5 @@ poetry.lock
 
 
 
-
+notebooks/trained_models/*
+notebooks/wandb/*
