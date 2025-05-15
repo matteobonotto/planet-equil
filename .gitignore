@@ -65,6 +65,7 @@ Thumbs.db
 data/.DS_Store
 
 ckpt/*
+*.ckpt
 wandb/*
 
 !id_train.npy
@@ -76,7 +77,6 @@ venv/*
 
 !planet/test/data/*
 
-wandb/*
 nohup.out
 trained_models/*
 trained_models_tf/*
@@ -85,7 +85,6 @@ poetry.lock
 
 !trained_models/planet_physics_informed
 !trained_models/planet_no_physics_informed
-
 
 
 

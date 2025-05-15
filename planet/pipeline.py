@@ -53,26 +53,27 @@ class PlaNet:
     def __call__(
         self,
         measures: _TypeNpFloat,
-        coils_current: _TypeNpFloat,
-        profile: _TypeNpFloat,
         rr: _TypeNpFloat,
         zz: _TypeNpFloat,
     ) -> _TypeNpFloat:
+        if measures.ndim == 1:
+            measures = measures[None, :]
+        if rr.ndim == 2:
+            rr = np.tile(rr[None, ...], (measures.shape[0], 1, 1))
+        if zz.ndim == 2:
+            zz = np.tile(zz[None, ...], (measures.shape[0], 1, 1))
 
         # prepare the inputs [simulating batch size of 1]
-        equil_inputs: _TypeNpFloat = np.column_stack(
-            (measures[None, :], coils_current[None, :], profile[None, :]),
-        )
-        scaled_inputs = self.scaler.transform(equil_inputs)
+        scaled_inputs = self.scaler.transform(measures)
 
         # perfrom the forward pass
         inputs = self._np_to_tensor(
-            [scaled_inputs, rr[None, :], zz[None, :]],
+            [scaled_inputs, rr, zz],
             device=self.device,
             dtype=self.dtype,
         )
         with torch.inference_mode():
-            flux = self.model(*inputs)
+            flux = self.model(inputs)
 
         # go back to np array (with the correct dtype and device)
         if self.device != torch.device("cpu"):

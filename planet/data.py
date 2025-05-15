@@ -157,16 +157,16 @@ class PlaNetDataset(Dataset):  # type: ignore[type-arg]
         self.do_super_resolution = do_super_resolution
 
         data = read_h5_numpy(path)
-        self.inputs = self.scaler.fit_transform(
-            np.column_stack(
-                (data["measures"], data["coils_current"], data["p_profile"])
-            )
-        )
+        self.inputs = self.scaler.fit_transform(data["measures"])
 
         self.flux = data["flux"]
-        self.rhs = data["rhs"]
         self.RR = data["RR_grid"]
         self.ZZ = data["ZZ_grid"]
+        self.rhs = data.get("rhs", None)
+        if self.rhs is None and is_physics_informed:
+            print(
+                "Dataset has no 'rhs' info and is_physics_informed=True, setting is_physics_informed=False"
+            )
 
         if self.nr != self.RR.shape[0] or self.nz != self.RR.shape[1]:
             rr = np.linspace(self.RR[0, 0], self.RR[0, -1], self.nr)
@@ -194,7 +194,8 @@ class PlaNetDataset(Dataset):  # type: ignore[type-arg]
     def __getitem__(self, idx: int) -> List[Tensor]:
         inputs = self.inputs[idx, ...]
         flux = self.flux[idx, ...]
-        rhs = self.rhs[idx, ...]
+        if self.is_physics_informed:
+            rhs = self.rhs[idx, ...]
         RR = self.RR
         ZZ = self.ZZ
 
@@ -202,9 +203,10 @@ class PlaNetDataset(Dataset):  # type: ignore[type-arg]
             flux = interp_fun(
                 f=flux, RR=self.base_RR, ZZ=self.base_ZZ, rr=self.RR, zz=self.ZZ
             )
-            rhs = interp_fun(
-                f=rhs, RR=self.base_RR, ZZ=self.base_ZZ, rr=self.RR, zz=self.ZZ
-            )
+            if self.is_physics_informed:
+                rhs = interp_fun(
+                    f=rhs, RR=self.base_RR, ZZ=self.base_ZZ, rr=self.RR, zz=self.ZZ
+                )
 
         if random.random() > 0.5 and self.do_super_resolution:
             # interpolate on a subgrid
@@ -225,7 +227,10 @@ class PlaNetDataset(Dataset):  # type: ignore[type-arg]
         else:
             rhs = rhs[1:-1, 1:-1]
 
-        L_ker, Df_ker = compute_Grda_Shafranov_kernels(RR=RR, ZZ=ZZ)
+        if self.is_physics_informed:
+            L_ker, Df_ker = compute_Grda_Shafranov_kernels(RR=RR, ZZ=ZZ)
+        else:
+            L_ker, Df_ker = np.zeros((3, 3)), np.zeros((3, 3))
 
         return _to_tensor(
             device=self.device,

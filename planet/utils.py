@@ -85,8 +85,8 @@ def write_h5(
     # verbose : bool = False,
 ) -> None:
 
-    # compression: str = "lzf"
-    compression: int = 1  # -> gzip compression level
+    compression: str = "lzf"
+    # compression: int = 1  # -> gzip compression level
 
     kwargs = {
         "dtype": dtype,

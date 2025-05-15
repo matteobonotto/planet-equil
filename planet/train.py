@@ -10,9 +10,9 @@ from torch.optim import Optimizer
 
 import lightning as L
 from lightning import Trainer
-from lightning.pytorch.callbacks import ModelCheckpoint, Callback
-from lightning.pytorch.loggers import WandbLogger
-from lightning.pytorch.utilities.types import LRSchedulerConfig
+from lightning.pytorch.callbacks import ModelCheckpoint, Callback, TQDMProgressBar
+from lightning.pytorch.loggers import WandbLogger, Logger
+from lightning.pytorch.utilities.types import LRSchedulerConfig, OptimizerLRScheduler
 
 from .config import Config
 from .model import PlaNetCore
@@ -92,6 +92,14 @@ class LightningPlaNet(L.LightningModule):
     def forward(self, *args: Any) -> Tensor:
         return self.model(*args)
 
+    def training_step(self, batch: Tensor, batch_idx: int) -> Tensor:
+        loss = self._compute_loss_batch(batch, batch_idx)
+        self.log("train_loss", loss, prog_bar=True)
+        # self.logger.log_metrics({'train_'+k:v for k,v in self.loss_module.log_dict.items()})
+        for k, v in self.loss_module.log_dict.items():
+            self.log(f"train_{k}", v, prog_bar=False)
+        return loss
+
     def _compute_loss_batch(self, batch: Tensor, batch_idx: int) -> Tensor:
         measures, flux, rhs, RR, ZZ, L_ker, Df_ker = batch
         pred = self((measures, RR, ZZ))
@@ -106,20 +114,20 @@ class LightningPlaNet(L.LightningModule):
         )
         return loss
 
-    def training_step(self, batch: Tensor, batch_idx: int) -> Tensor:
-        loss = self._compute_loss_batch(batch, batch_idx)
-        self.log("train_loss", loss, prog_bar=True)
-        # self.logger.log_metrics({'train_'+k:v for k,v in self.loss_module.log_dict.items()})
-        for k, v in self.loss_module.log_dict.items():
-            self.log(f"train_{k}", v, prog_bar=False)
-        return loss
+    def on_train_batch_end(self, outputs, batch, batch_idx):
+        self._log_lr()
+
+    def _log_lr(self):
+        optimizer = self.optimizers()
+        lr = optimizer.param_groups[0]["lr"]
+        self.log("lr", lr, on_step=True, on_epoch=False)
 
     def validation_step(self, batch: Tensor, batch_idx: int) -> Tensor:
         loss = self._compute_loss_batch(batch, batch_idx)
         self.log("val_loss", loss, prog_bar=True)
         return loss
 
-    def configure_optimizers(self) -> Tuple[List[Optimizer], List[LRSchedulerConfig]]:
+    def configure_optimizers(self) -> Any:
         optimizer = torch.optim.AdamW(self.parameters(), lr=1e-3)
         scheduler = torch.optim.lr_scheduler.LinearLR(
             optimizer,
@@ -129,17 +137,18 @@ class LightningPlaNet(L.LightningModule):
                 5 if self.trainer.max_epochs is None else self.trainer.max_epochs
             ),
         )
-        scheduler_config = LRSchedulerConfig(
-            scheduler=scheduler,
-            interval="epoch",
-            frequency=1,
-        )
-        return [optimizer], [scheduler_config]
+        # optimizer_lrscheduler_config = LRSchedulerConfig(
+        #     scheduler=scheduler,
+        #     interval="epoch",
+        #     frequency=1,
+        # )
+        # return [optimizer_lrscheduler_config]
+        return [optimizer], [{"scheduler": scheduler, "interval": "epoch"}]
 
 
 def main_train(config: Config) -> None:
     #
-    save_dir = Path(config.save_path).parent
+    save_dir = Path(config.save_path)
     save_dir.mkdir(exist_ok=True, parents=True)
 
     ### instantiate model and datamodule
@@ -147,7 +156,7 @@ def main_train(config: Config) -> None:
     datamodule = DataModule(config=config)
 
     ### define some callbacks
-    callbacks: List[Callback] = []
+    callbacks: List[Callback] = [TQDMProgressBar(refresh_rate=10)]
     if config.save_checkpoints is not None:
         callbacks.append(
             ModelCheckpoint(
@@ -156,8 +165,9 @@ def main_train(config: Config) -> None:
         )
 
     # get the logger
+    logger: Optional[Logger] = None
     if config.log_to_wandb:
-        wandb_logger = WandbLogger(project=config.wandb_project)
+        logger = WandbLogger(project=config.wandb_project)
 
     ### train the model
     trainer = Trainer(
@@ -165,7 +175,7 @@ def main_train(config: Config) -> None:
         accelerator=get_accelerator(),
         devices="auto",
         callbacks=callbacks,
-        logger=wandb_logger,
+        logger=logger,
     )
     trainer.fit(
         model=model,

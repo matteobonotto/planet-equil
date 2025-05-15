@@ -1,12 +1,11 @@
+import numpy as np
+from scipy import io
 from planet.utils import read_h5_numpy, write_h5
+import time
 
 if __name__ == "__main__":
 
-    from scipy import io
-
-    mat = io.loadmat(
-        "/Users/matte/Documents/RESEARCH/PlaNet_Equil_reconstruction/ITER_like_equilibrium_dataset.mat"
-    )
+    mat = io.loadmat("/Users/matte/Downloads/ITER_like_equilibrium_dataset.mat")
 
     print(mat.keys())
 
@@ -22,35 +21,35 @@ if __name__ == "__main__":
     # f_profile                   = mat['DB_f_test_ConvNet']
     p_profile = mat["DB_p_test_ConvNet"]
 
+    measures = np.column_stack([measures, coils_current, p_profile])
+
     data = {
-        "measures": measures,
-        "flux": flux,
-        "rhs": rhs,
-        "coils_current": coils_current,
         "RR_grid": RR_grid,
         "ZZ_grid": ZZ_grid,
-        "p_profile": p_profile,
+        "flux": flux,
+        "rhs": rhs,
+        "measures": measures,
     }
+
     # data = {k: v.astype("float32") for k, v in data.items()}
+    t0 = time.time()
     write_h5(data, filename="iter_like_data")
-
-    data_sample = {
-        k: v[:64, ...] for k, v in data.items() if "RR" not in k and "ZZ" not in k
-    }
-    data_sample["RR_grid"] = data["RR_grid"]
-    data_sample["ZZ_grid"] = data["ZZ_grid"]
-    write_h5(data_sample, filename="planet/tests/data/iter_like_data_sample")
-
-    import pyarrow as pa
-
-    pa.Table.from_pydict(data)
-
-    write_h5(data, filename="iter_like_data")
-    import time
+    t1 = time.time() - t0
+    print(f"Saving time: {t1:3.3}s")
 
     t0 = time.time()
     data = read_h5_numpy(filename="iter_like_data.h5")
     t1 = time.time() - t0
+    print(f"Loading time: {t1:3.3}s")
+
+    data_sample = {
+        "RR_grid": RR_grid,
+        "ZZ_grid": ZZ_grid,
+        "flux": flux[:128, ...],
+        "rhs": rhs[:128, ...],
+        "measures": measures[:128, ...],
+    }
+    write_h5(data_sample, filename="planet/tests/data/iter_like_data_sample")
 
     # # create the dataset with the equilibria on the full grid
     # import tensorflow as tf
