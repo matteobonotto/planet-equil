@@ -1,7 +1,7 @@
 # PlaNet: plasma equilibrium reconstruction using physics-informed neural operator.
 This is the official repository if the `planet` package. It is a PyTorch implementation of PlaNet (PLAsma equilibrium reconstruction NETwork), a convolutional physics-informed neural operator for performing plasma equilibrium reconstruction using magnetic and non-magnetic measurements.
 
-For any kind of reference on the model architecture and th math, see [this paper](https://www.sciencedirect.com/science/article/abs/pii/S0920379624000474). The original work was developed using TensorFlow, as mentioned in the paper. This is a polished and optimized version, using modern PyTorch and PyTorch Lightning. 
+For any kind of reference on the model architecture or the mathematical formulation, see [this paper](https://www.sciencedirect.com/science/article/abs/pii/S0920379624000474). The original work was developed using TensorFlow, as mentioned in the paper. This is a polished and optimized version, using modern PyTorch and PyTorch Lightning. 
 
 # Installation
 First, create a virtual environment using `venv`
