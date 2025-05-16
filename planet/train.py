@@ -144,7 +144,7 @@ def get_best_model(config: Config) -> nn.Module:
     lightning_planet = LightningPlaNet.load_from_checkpoint(
         best_ckpt_path, config=config
     )
-    model = lightning_planet
+    model = lightning_planet.model
     model.to(torch.device("cpu"))
     return model
 
@@ -193,8 +193,8 @@ def main_train(config: Config) -> None:
     ### save model + scaler for inference
     try:
         # get the model from the best saved checkpoint
-        model = get_best_model(config=config)
+        planet_model = get_best_model(config=config)
     except:
         # is something fails, get the model from the trainer
-        model = trainer.model.model.to(torch.device("cpu"))
-    save_model_and_scaler(model, datamodule.dataset.scaler, config)
+        planet_model = trainer.model.model.to(torch.device("cpu"))  # type: ignore
+    save_model_and_scaler(planet_model, datamodule.dataset.scaler, config)
