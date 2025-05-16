@@ -197,7 +197,7 @@ class PlaNetCoreSlim_(nn.Module):
             in_dim=nr + nz,
             out_dim=hidden_dim,
             hidden_dim=hidden_dim,
-            n_layers=2,
+            n_layers=3,
             nr=nr,
             nz=nz,
         )
@@ -205,13 +205,13 @@ class PlaNetCoreSlim_(nn.Module):
             in_dim=branch_in_dim,
             out_dim=hidden_dim,
             hidden_dim=hidden_dim,
-            n_layers=2,
+            n_layers=4,
         )
         self.decoder = GatedMLPStack(
             in_dim=hidden_dim,
             out_dim=nr * nz,
             hidden_dim=hidden_dim,
-            n_layers=3,
+            n_layers=4,
         )
 
     def forward(self, x: Tuple[Tensor, Tensor, Tensor]) -> Tensor:
