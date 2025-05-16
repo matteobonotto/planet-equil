@@ -19,7 +19,7 @@
             "program": "${workspaceFolder}/planet/scripts/main_train.py",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args" : ["-c", "planet/tests/data/config.yml"]
+            "args" : ["-c", "config/config.yml"]
         }
     ]
 }

@@ -1,4 +1,4 @@
-from typing import List, Tuple, Any, Optional, Dict
+from typing import List, Tuple, Any, Optional, Dict, Type
 import random
 import torch
 from pathlib import Path
@@ -13,7 +13,8 @@ from lightning.pytorch.callbacks import ModelCheckpoint, Callback, TQDMProgressB
 from lightning.pytorch.loggers import WandbLogger, Logger
 
 from .config import Config
-from .model import PlaNetCore
+from .models.planet_conv import PlaNetCore
+from .models.planet_slim import PlaNetCoreSlim
 from .loss import PlaNetLoss
 from .data import PlaNetDataset, get_device
 from .utils import get_accelerator, last_ckp_path, save_model_and_scaler
@@ -30,6 +31,12 @@ def collate_fun(batch: _TypeBatch) -> List[Tensor]:
         torch.stack([s[5] for s in batch], dim=0),  # L_ker
         torch.stack([s[6] for s in batch], dim=0),  # Dr_ker
     ]
+
+
+MAP_MODEL: Dict[str, Type[nn.Module]] = {
+    "planet": PlaNetCore,
+    "planet_slim": PlaNetCoreSlim,
+}
 
 
 class DataModule(L.LightningDataModule):
@@ -84,7 +91,7 @@ class LightningPlaNet(L.LightningModule):
     def __init__(self, config: Config):
         super().__init__()
         assert config.planet is not None, "must provide valid config.planet, got None"
-        self.model = PlaNetCore(**config.planet.to_dict())
+        self.model = MAP_MODEL[config.model_name](**config.planet.to_dict())
         self.loss_module = PlaNetLoss(is_physics_informed=config.is_physics_informed)
 
     def forward(self, *args: Any) -> Tensor:

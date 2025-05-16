@@ -20,6 +20,7 @@ class Config:
     dataset_path: str = ""
     batch_size: int = 64
     epochs: int = 10
+    model_name: str = "planet"
     planet_config: Dict[str, int] = field(default_factory=dict)
     planet: PlaNetConfig = field(default_factory=PlaNetConfig)
     log_to_wandb: bool = False
