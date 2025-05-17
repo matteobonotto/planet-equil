@@ -160,8 +160,8 @@ class PlaNetDataset(Dataset):  # type: ignore[type-arg]
         self.inputs = self.scaler.fit_transform(data["measures"])
 
         self.flux = data["flux"]
-        self.RR = (data["RR_grid"] - data["RR_grid"].mean()) / data["RR_grid"].std()
-        self.ZZ = (data["ZZ_grid"] - data["ZZ_grid"].mean()) / data["ZZ_grid"].std()
+        self.RR = data["RR_grid"]
+        self.ZZ = data["ZZ_grid"]
         self.rhs = data.get("rhs", None)
         if self.rhs is None and is_physics_informed:
             print(

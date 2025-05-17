@@ -140,4 +140,4 @@ class PlaNetLoss(nn.Module):
                 ZZ=ZZ,
             )
             self.log_dict["pde_loss"] = pde_loss.item()
-            return mse_loss + pde_loss
+            return 0.5 * (mse_loss + pde_loss)
