@@ -8,10 +8,16 @@ class PlaNetConfig:
     hidden_dim: int = 128
     nr: int = 64
     nz: int = 64
-    branch_in_dim: int = 302
+    n_measures: int = 302
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
+
+    def __repr__(self) -> str:
+        s = f"{self.__class__.__name__} with arguments: \n"
+        for attr in vars(self).keys():
+            s += f"    {attr}: {getattr(self, attr)}\n"
+        return s
 
 
 @dataclass
@@ -25,9 +31,9 @@ class Config:
     log_to_wandb: bool = False
     wandb_project: Optional[str] = None
     save_checkpoints: bool = False
-    save_path: str = "tmp/model.pt"
+    save_path: str = "tmp/"
     resume_from_checkpoint: bool = False
-    num_workers: int = 4
+    num_workers: int = 0
     do_super_resolution: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
@@ -48,3 +54,9 @@ class Config:
             cls_instance.planet = PlaNetConfig(**cls_instance.planet_config)
 
         return cls_instance
+
+    def __repr__(self) -> str:
+        s = f"{self.__class__.__name__} with arguments: \n"
+        for attr in vars(self).keys():
+            s += f"    {attr}: {getattr(self, attr)}\n"
+        return s.replace("\n\n", "\n")

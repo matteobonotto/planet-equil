@@ -1,8 +1,9 @@
 from argparse import ArgumentParser, Namespace
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 import yaml  # type: ignore
 from pathlib import Path
 import re
+import numpy as np
 import torch
 from torch import nn
 import pickle
@@ -12,6 +13,21 @@ import h5py
 from sklearn.preprocessing import StandardScaler
 
 from .config import Config
+from .constants import DTYPE
+from .types import _TypeNpFloat
+
+
+def dummy_planet_input(
+    batch_size: int = 32,
+    nr: int = 64,
+    nz: int = 64,
+    n_measures: int = 302,
+) -> Tuple[_TypeNpFloat, _TypeNpFloat, _TypeNpFloat]:
+    return (
+        np.random.normal(size=(batch_size, n_measures)),
+        np.random.normal(size=(batch_size, nr, nz)),
+        np.random.normal(size=(batch_size, nr, nz)),
+    )
 
 
 def parse_arguments() -> Namespace:
@@ -51,6 +67,7 @@ def save_model_and_scaler(
 ) -> None:
     save_dir = Path(config.save_path)
     save_dir.mkdir(exist_ok=True, parents=True)
+    print(f"Saving model and scaler to {save_dir}")
 
     # save model config
     json.dump(config.planet.to_dict(), open(save_dir / Path("config.json"), "w"))

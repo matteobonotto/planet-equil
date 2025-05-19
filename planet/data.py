@@ -83,14 +83,14 @@ def interp_fun(
     return f_int
 
 
-def compute_Grda_Shafranov_kernels(
+def compute_Grad_Shafranov_kernels(
     RR: _TypeNpFloat, ZZ: _TypeNpFloat
 ) -> Tuple[_TypeNpFloat, _TypeNpFloat]:
     hr = RR[1, 2] - RR[1, 1]
     hz = ZZ[2, 1] - ZZ[1, 1]
     alfa = -2 * (hr**2 + hz**2)
     Laplace_kernel = np.array(
-        ([0, hr**2 / alfa, 0], [hz**2 / alfa, 1, hz**2 / alfa], [0, hr**2 / alfa, 0])
+        [[0, hr**2 / alfa, 0], [hz**2 / alfa, 1, hz**2 / alfa], [0, hr**2 / alfa, 0]]
     )
     Df_dr_kernel = (
         np.array(([0, 0, 0], [+1, 0, -1], [0, 0, 0]))
@@ -228,7 +228,7 @@ class PlaNetDataset(Dataset):  # type: ignore[type-arg]
             rhs = rhs[1:-1, 1:-1]
 
         if self.is_physics_informed:
-            L_ker, Df_ker = compute_Grda_Shafranov_kernels(RR=RR, ZZ=ZZ)
+            L_ker, Df_ker = compute_Grad_Shafranov_kernels(RR=RR, ZZ=ZZ)
         else:
             L_ker, Df_ker = np.zeros((3, 3)), np.zeros((3, 3))
 

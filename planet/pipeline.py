@@ -13,7 +13,7 @@ from scipy import signal
 
 from .model import PlaNetCore
 from .config import PlaNetConfig
-from .data import compute_Grda_Shafranov_kernels
+from .data import compute_Grad_Shafranov_kernels
 from .loss import Gauss_kernel_5x5
 from .types import _TypeNpFloat
 
@@ -32,6 +32,7 @@ class PlaNet:
 
     @classmethod
     def from_pretrained(cls, path: str) -> PlaNet:
+        print(f"Loading model from {path}")
         model_path = Path(path)
 
         # load model config
@@ -81,10 +82,10 @@ class PlaNet:
 
         return flux.numpy().astype(measures.dtype)
 
-    def compute_gs_operator(
+    def _compute_gs_ope(
         self, flux: _TypeNpFloat, rr: _TypeNpFloat, zz: _TypeNpFloat
     ) -> _TypeNpFloat:
-        L_ker, Df_dr_ker = compute_Grda_Shafranov_kernels(rr, zz)
+        L_ker, Df_dr_ker = compute_Grad_Shafranov_kernels(rr, zz)
         hr = rr[1, 2] - rr[1, 1]
         hz = zz[2, 1] - zz[1, 1]
         Lpsi = signal.convolve2d(flux, L_ker, mode="valid")
@@ -92,5 +93,22 @@ class PlaNet:
         lhs_scipy = Lpsi - Dpsi_dr / rr[1:-1, 1:-1]
         alfa = -2 * (hr**2 + hz**2)
         beta = alfa / (hr**2 * hz**2)
-        gs_ope_smooth = signal.convolve(lhs_scipy * beta, Gauss_kernel_5x5, mode="same")
-        return gs_ope_smooth
+        return signal.convolve(lhs_scipy * beta, Gauss_kernel_5x5, mode="same")
+
+    def _compute_gs_ope_batch(
+        self, flux: _TypeNpFloat, rr: _TypeNpFloat, zz: _TypeNpFloat
+    ) -> _TypeNpFloat:
+        gs_ope = np.zeros_like(flux[:, 1:-1, 1:-1])
+        for i_batch in range(rr.shape[0]):
+            gs_ope[i_batch, ...] = self._compute_gs_ope(
+                flux[i_batch, ...], rr[i_batch, ...], zz[i_batch, ...]
+            )
+        return gs_ope
+
+    def compute_gs_operator(
+        self, flux: _TypeNpFloat, rr: _TypeNpFloat, zz: _TypeNpFloat
+    ) -> _TypeNpFloat:
+        if rr.ndim > 2:
+            return self._compute_gs_ope_batch(flux, rr, zz)
+        else:
+            return self._compute_gs_ope(flux, rr, zz)

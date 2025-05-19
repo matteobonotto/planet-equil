@@ -250,14 +250,14 @@ class PlaNetCore(nn.Module):
         hidden_dim: int = 128,
         nr: int = 64,
         nz: int = 64,
-        branch_in_dim: int = 302,
+        n_measures: int = 302,
     ):
         super().__init__()
         self.config = PlaNetConfig(
-            nr=nr, nz=nz, hidden_dim=hidden_dim, branch_in_dim=branch_in_dim
+            nr=nr, nz=nz, hidden_dim=hidden_dim, n_measures=n_measures
         )
         self.trunk = TrunkNet(hidden_dim=hidden_dim, nr=nr, nz=nz)
-        self.branch = BranchNet(hidden_dim=hidden_dim, in_dim=branch_in_dim)
+        self.branch = BranchNet(hidden_dim=hidden_dim, in_dim=n_measures)
         self.decoder = Decoder(hidden_dim=hidden_dim, nr=nr, nz=nz)
 
     def forward(self, x: Tuple[Tensor, Tensor, Tensor]) -> Tensor:
