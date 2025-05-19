@@ -4,62 +4,9 @@ from typing import Tuple, List
 # import tensorflow as tf
 import torch
 from torch import Tensor, nn
-import torch.nn.functional as F
 
-import numpy as np
-from matplotlib import pyplot as plt
-import matplotlib.lines as mlines
-
-from .config import PlaNetConfig
-
-
-DTYPE = torch.float32
-
-
-class TrainableSwish(nn.Module):
-    def __init__(self, beta: float = 1.0):
-        super().__init__()
-        self.beta = nn.Parameter(torch.tensor(beta))
-
-    def forward(self, x: Tensor) -> Tensor:
-        return swish(x, self.beta)
-
-
-def swish(x: Tensor, beta: nn.Parameter) -> Tensor:
-    return x * F.sigmoid(beta * x)
-
-
-class Conv2dNornAct(nn.Module):
-    def __init__(
-        self,
-        in_channels: int,
-        out_channels: int,
-        kernel_size: Tuple[int, int] = (3, 3),
-        padding: str = "same",
-    ):
-        super().__init__()
-        self.conv2d = nn.Conv2d(
-            in_channels=in_channels,
-            out_channels=out_channels,
-            kernel_size=kernel_size,
-            padding=padding,
-        )
-        self.norm = nn.BatchNorm2d(num_features=out_channels)
-        self.act = TrainableSwish()
-
-    def forward(self, x: Tensor) -> Tensor:
-        """
-        x = layers.Conv2D(
-            filters=filters,
-            kernel_size=kernel_size,
-            strides=1,
-            padding="same",
-            dtype=DTYPE,
-        )(x)
-        x = layers.BatchNormalization()(x)
-        x = Swish(beta=1.0, trainable=True)(x)
-        """
-        return self.act(self.norm(self.conv2d(x)))
+from ..config import PlaNetConfig
+from .layers import Conv2dNornAct, TrainableSwish
 
 
 class TrunkNet(nn.Module):

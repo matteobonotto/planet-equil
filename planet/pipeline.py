@@ -11,7 +11,7 @@ from numpy.typing import NDArray
 
 from scipy import signal
 
-from .model import PlaNetCore
+from .models.planet_conv import PlaNetCore
 from .config import PlaNetConfig
 from .data import compute_Grda_Shafranov_kernels
 from .loss import Gauss_kernel_5x5

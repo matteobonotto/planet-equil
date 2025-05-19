@@ -1,5 +1,5 @@
 import torch
-from planet.model import TrunkNet, BranchNet, Decoder, PlaNetCore
+from planet.models.planet_conv import TrunkNet, BranchNet, Decoder, PlaNetCore
 
 DTYPE = torch.float32
 

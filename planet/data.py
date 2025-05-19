@@ -221,11 +221,14 @@ class PlaNetDataset(Dataset):  # type: ignore[type-arg]
                     zz=zz[1:-1, 1:-1],
                 )
             else:
-                rhs = np.zeros_like(rhs[1:-1, 1:-1])
+                rhs = np.zeros_like(flux[1:-1, 1:-1])
             RR = rr
             ZZ = zz
         else:
-            rhs = rhs[1:-1, 1:-1]
+            if self.is_physics_informed:
+                rhs = rhs[1:-1, 1:-1]
+            else:
+                rhs = np.zeros_like(flux[1:-1, 1:-1])
 
         if self.is_physics_informed:
             L_ker, Df_ker = compute_Grda_Shafranov_kernels(RR=RR, ZZ=ZZ)
