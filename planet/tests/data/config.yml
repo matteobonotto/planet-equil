@@ -13,4 +13,4 @@ planet_config:
   hidden_dim: 128
   nr: 64
   nz: 64
-  branch_in_dim: 302
+  n_measures: 302

@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 import torch
 from torch import nn
+import torch
 import pickle
 from lightning import Trainer
 import json
@@ -12,6 +13,23 @@ import h5py
 from sklearn.preprocessing import StandardScaler
 
 from .config import Config
+from .constants import DTYPE
+
+
+def dummy_planet_input(
+    batch_size: int = 32,
+    nr: int = 64,
+    nz: int = 64,
+    n_measures: int = 302,
+    dtype: torch.dtype = DTYPE,
+    device: torch.device = torch.device("cpu"),
+):
+    inputs = tuple(
+        torch.rand([batch_size, n_measures], dtype=dtype, device=device),
+        torch.rand([batch_size, nr, nz], dtype=dtype, device=device),
+        torch.rand([batch_size, nr, nz], dtype=dtype, device=device),
+    )
+    return inputs
 
 
 def parse_arguments() -> Namespace:
