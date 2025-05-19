@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader, Subset
 from multiprocessing import cpu_count
 
 from torch import Tensor, nn
+from torchinfo import summary
 
 import lightning as L
 from lightning import Trainer
@@ -92,6 +93,7 @@ class LightningPlaNet(L.LightningModule):
         super().__init__()
         assert config.planet is not None, "must provide valid config.planet, got None"
         self.model = MAP_MODEL[config.model_name](**config.planet.to_dict())
+        summary(self.model)
         self.loss_module = PlaNetLoss(is_physics_informed=config.is_physics_informed)
 
     def forward(self, *args: Any) -> Tensor:

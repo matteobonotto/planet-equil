@@ -47,7 +47,7 @@ def last_ckp_path(ckpt_path: str | Path) -> Path:
 
 
 def save_model_and_scaler(
-    trainer: Trainer, scaler: StandardScaler, config: Config
+    planet_model: Trainer, scaler: StandardScaler, config: Config
 ) -> None:
     save_dir = Path(config.save_path).parent
     save_dir.mkdir(exist_ok=True, parents=True)
@@ -56,9 +56,9 @@ def save_model_and_scaler(
     json.dump(config.planet.to_dict(), open(save_dir / Path("config.json"), "w"))
 
     # save model
-    assert trainer.model is not None, "Trainer.model is None — can't save it"
-    assert isinstance(trainer.model.model, nn.Module), "Expected nn.Module"
-    planet_model = trainer.model.model
+    # assert trainer.model is not None, "Trainer.model is None — can't save it"
+    # assert isinstance(trainer.model.model, nn.Module), "Expected nn.Module"
+    # planet_model = trainer.model.model
     planet_model.eval()
     torch.save(planet_model.state_dict(), save_dir / Path("model.pt"))
 

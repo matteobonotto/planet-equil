@@ -165,9 +165,13 @@ class Decoder(nn.Module):
         assert nz % 2 == 0, f"nz must be a power of 2, got {nz}"
         self.nr = nr
         self.nz = nz
-        self.channels = [128, 32, 16, 8]
-        self.channels = [32, 16, 8, 4, 2]
-        self.channels = [64, 32, 8, 4]
+        # self.channels = [128, 32, 16, 8]
+        # self.channels = [32, 16, 8, 4, 2]
+        self.channels = [64, 32, 8, 4]  # (planet_slim_1) good choice
+        self.channels = [64, 32, 16, 8]  # planet_slim_2
+        # self.channels = [64, 32, 16, 8, 1] # planet_slim_3
+        self.channels = [32, 16, 8, 4]  # planet_slim_4
+        self.channels = [64, 32, 16, 8, 4]  # planet_slim_5
         # channels = [32, 16, 8, 4, 1]
         n_conv = len(self.channels)
         self.linear = nn.Linear(

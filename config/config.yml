@@ -1,5 +1,5 @@
 is_physics_informed: True
-save_path:  'trained_models/test/'
+save_path:  'trained_models/planet_slim_5/'
 dataset_path: data/iter_like_data.h5 # planet/tests/data/iter_like_data_sample.h5 #data/iter_like_data.h5
 do_super_resolution: false
 batch_size: 256
