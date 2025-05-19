@@ -1,16 +1,19 @@
 # PlaNet: plasma equilibrium reconstruction using physics-informed neural operator.
-This is the official repository if the `planet` package. It is a PyTorch implementation of PlaNet (PLAsma equilibrium reconstruction NETwork), a convolutional physics-informed neural operator for performing plasma equilibrium reconstruction using magnetic and non-magnetic measurements.
+This is the official repository if the `planet-equil` package. It is a PyTorch implementation of PlaNet (PLAsma equilibrium reconstruction NETwork), a convolutional physics-informed neural operator for performing plasma equilibrium reconstruction using magnetic and non-magnetic measurements.
 
 For any kind of reference on the model architecture or the mathematical formulation, see [this paper](https://www.sciencedirect.com/science/article/abs/pii/S0920379624000474). The original work was developed using TensorFlow, as mentioned in the paper. This is a polished and optimized version, using modern PyTorch and PyTorch Lightning. 
 
 # Installation
-First, create a virtual environment using `venv`
+The package can be installing with pip by running:
 ```shell
-python3.10 -m venv venv 
-source venv/bin/activate
+pip install planet-equil
 ```
-then install the package and all the dependencies using `poetry`
+
+## Dev installation
+Alternatively, if you want to develop your own stuff you can clone the repo and then install the package and all the dependencies using `poetry`
 ```shell
+git clone git@github.com:matteobonotto/planet-equil.git
+cd planet-equil
 pip3 install poetry==1.8.3
 poetry config virtualenvs.create false
 poetry install
@@ -26,6 +29,9 @@ There are tutorial notebooks available to get started with `planet`:
 - [2_model_training.ipynb](notebooks/2_model_training.ipynb): shows how to perfrom a full training of the PlaNet model using PyTorch Lightning`.
 - [3_load_pretrained_and_prediction.ipynb](notebooks/3_load_pretrained_and_prediction.ipynb): shows how to load a pretrained model and how to use if to perform reconstruction of plasma equilibrium and to estimate the Grad-Shafranov operator.
 
+
+### Citations
+If you find the repository useful please consider citing [this paper](https://doi.org/10.1016/j.fusengdes.2024.114193).
 
 
 
