@@ -5,7 +5,7 @@ description = "PlaNet: reconstruction of plasma equilibrium and separatrix using
 readme = "README.md"
 authors = ["Matteo Bonotto <m.bonotto@outlook.com>"]
 license = "MIT"  
-packages = [{ include = "planetequil" }]
+packages = [{ include = "planet_equil" }]
 
 [build-system]
 requires = ["poetry-core"]
