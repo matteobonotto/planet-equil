@@ -1,11 +1,11 @@
 is_physics_informed: True
-save_path:  'trained_models/planet_slim_5/'
+save_path:  'trained_models/planet_slim_7/'
 dataset_path: data/iter_like_data.h5 # planet/tests/data/iter_like_data_sample.h5 #data/iter_like_data.h5
 do_super_resolution: false
-batch_size: 5
+batch_size: 256
 epochs: 1500
 model_name: planet_slim
-log_to_wandb: true
+log_to_wandb: True
 wandb_project: planet
 save_checkpoints: true
 resume_from_checkpoint: false

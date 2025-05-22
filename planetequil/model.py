@@ -6,7 +6,7 @@ import torch
 from torch import Tensor, nn
 
 from ..config import PlaNetConfig
-from .layers import Conv2dNornAct, TrainableSwish
+from .models.layers import Conv2dNornAct, TrainableSwish
 
 
 class TrunkNet(nn.Module):

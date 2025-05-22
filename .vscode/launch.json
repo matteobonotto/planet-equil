@@ -16,7 +16,7 @@
             "name": "main train",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/planet/scripts/main_train.py",
+            "program": "${workspaceFolder}/planetequil/scripts/main_train.py",
             "console": "integratedTerminal",
             "justMyCode": false,
             "args" : ["-c", "config/config.yml"]

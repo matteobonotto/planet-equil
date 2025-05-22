@@ -148,11 +148,11 @@ class PlaNetCoreSlim(nn.Module):
         hidden_dim: int = 128,
         nr: int = 64,
         nz: int = 64,
-        branch_in_dim: int = 302,
+        n_measures: int = 302,
     ):
         super().__init__()
         self.config = PlaNetConfig(
-            nr=nr, nz=nz, hidden_dim=hidden_dim, branch_in_dim=branch_in_dim
+            nr=nr, nz=nz, hidden_dim=hidden_dim, n_measures=n_measures
         )
         self.trunk = TrunkNet(
             in_dim=nr + nz,
@@ -163,7 +163,7 @@ class PlaNetCoreSlim(nn.Module):
             nz=nz,
         )
         self.branch = MLPStack(
-            in_dim=branch_in_dim,
+            in_dim=n_measures,
             out_dim=hidden_dim,
             n_layers=2,
         )
@@ -187,11 +187,11 @@ class PlaNetCoreSlim_(nn.Module):
         hidden_dim: int = 256,
         nr: int = 64,
         nz: int = 64,
-        branch_in_dim: int = 302,
+        n_measures: int = 302,
     ):
         super().__init__()
         self.config = PlaNetConfig(
-            nr=nr, nz=nz, hidden_dim=hidden_dim, branch_in_dim=branch_in_dim
+            nr=nr, nz=nz, hidden_dim=hidden_dim, n_measures=n_measures
         )
         self.trunk = TrunkNet(
             in_dim=nr + nz,
@@ -202,7 +202,7 @@ class PlaNetCoreSlim_(nn.Module):
             nz=nz,
         )
         self.branch = GatedMLPStack(
-            in_dim=branch_in_dim,
+            in_dim=n_measures,
             out_dim=hidden_dim,
             hidden_dim=hidden_dim,
             n_layers=4,

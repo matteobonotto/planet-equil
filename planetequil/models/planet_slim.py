@@ -143,17 +143,18 @@ class TrunkNet(nn.Module):
 class BranchNet(nn.Module):
     def __init__(self, in_dim: int = 302, hidden_dim: int = 128):
         super().__init__()
-        self.linear_1 = nn.Linear(in_features=in_dim, out_features=256)
-        self.norm_1 = nn.BatchNorm1d(num_features=256)
+        self.linear_1 = nn.Linear(in_features=in_dim, out_features=hidden_dim)
+        self.norm_1 = nn.BatchNorm1d(num_features=hidden_dim)
         self.act_1 = TrainableSwish(beta=1.0)
-        self.linear_2 = nn.Linear(in_features=256, out_features=128)
-        self.norm_2 = nn.BatchNorm1d(num_features=128)
+        self.linear_2 = nn.Linear(in_features=hidden_dim, out_features=hidden_dim)
+        self.norm_2 = nn.BatchNorm1d(num_features=hidden_dim)
         self.act_2 = TrainableSwish(beta=1.0)
-        self.linear_3 = nn.Linear(in_features=128, out_features=hidden_dim)
+        self.linear_3 = nn.Linear(in_features=hidden_dim, out_features=hidden_dim)
 
     def forward(self, x: Tensor) -> Tensor:
         x = self.act_1(self.norm_1(self.linear_1(x)))
-        x = self.act_2(self.norm_2(self.linear_2(x)))
+        x_skip = x
+        x = self.act_2(self.norm_2(self.linear_2(x))) + x_skip
         x = self.linear_3(x)
         return x
 
@@ -168,10 +169,10 @@ class Decoder(nn.Module):
         # self.channels = [128, 32, 16, 8]
         # self.channels = [32, 16, 8, 4, 2]
         self.channels = [64, 32, 8, 4]  # (planet_slim_1) good choice
-        self.channels = [64, 32, 16, 8]  # planet_slim_2
+        # self.channels = [64, 32, 16, 8]  # planet_slim_2
         # self.channels = [64, 32, 16, 8, 1] # planet_slim_3
-        self.channels = [32, 16, 8, 4]  # planet_slim_4
-        self.channels = [64, 32, 16, 8, 4]  # planet_slim_5
+        # self.channels = [32, 16, 8, 4]  # planet_slim_4
+        # self.channels = [64, 32, 16, 8, 4]  # planet_slim_5
         # channels = [32, 16, 8, 4, 1]
         n_conv = len(self.channels)
         self.linear = nn.Linear(
@@ -224,14 +225,14 @@ class PlaNetCoreSlim(nn.Module):
         hidden_dim: int = 128,
         nr: int = 64,
         nz: int = 64,
-        branch_in_dim: int = 302,
+        n_measures: int = 302,
     ):
         super().__init__()
         self.config = PlaNetConfig(
-            nr=nr, nz=nz, hidden_dim=hidden_dim, branch_in_dim=branch_in_dim
+            nr=nr, nz=nz, hidden_dim=hidden_dim, n_measures=n_measures
         )
         self.trunk = TrunkNet(hidden_dim=hidden_dim, nr=nr, nz=nz)
-        self.branch = BranchNet(hidden_dim=hidden_dim, in_dim=branch_in_dim)
+        self.branch = BranchNet(hidden_dim=hidden_dim, in_dim=n_measures)
         self.decoder = Decoder(hidden_dim=hidden_dim, nr=nr, nz=nz)
 
     def forward(self, x: Tuple[Tensor, Tensor, Tensor]) -> Tensor:
