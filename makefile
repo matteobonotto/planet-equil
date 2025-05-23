@@ -14,19 +14,19 @@ build:
 # Utilities
 
 test:
-	pytest -vs planet/tests/ -m "not slow"
+	pytest -vs planetequil/tests/ -m "not slow"
 
 test-full:
-	pytest -vs planet/ests/
+	pytest -vs planetequil/ests/
 
 style:
-	poetry run black planet
+	poetry run black planetequil
 
 type: 
-	poetry run mypy planet --config-file pyproject.toml
+	poetry run mypy planetequil --config-file pyproject.toml
 
 train:
-	python planet/scripts/main_train.py -config "config/config.yml"
+	python planetequil/scripts/main_train.py -config "config/config.yml"
 
 
 

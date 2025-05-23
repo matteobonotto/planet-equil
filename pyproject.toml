@@ -1,10 +1,11 @@
 [tool.poetry]
-name = "planet"
+name = "planet-equil"
 version = "0.1.0"
 description = "PlaNet: reconstruction of plasma equilibrium and separatrix using convolutional physics-informed neural operator. See https://doi.org/10.1016/j.fusengdes.2024.114193"
 readme = "README.md"
 authors = ["Matteo Bonotto <m.bonotto@outlook.com>"]
-license = "MIT"  # Specify the license
+license = "MIT"  
+packages = [{ include = "planetequil" }]
 
 [build-system]
 requires = ["poetry-core"]
@@ -46,7 +47,7 @@ ignore_missing_imports = true
 disable_error_code = ["no-any-return"]
 strict = true
 exclude = [
-    "planet/tests",
+    "planetequil/tests",
 ]
 
 [tool.pytest.ini_options]
