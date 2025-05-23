@@ -18,6 +18,7 @@ from lightning.pytorch.loggers import WandbLogger, Logger
 from .config import Config
 from .models.planet_conv import PlaNetCore
 from .models.planet_slim import PlaNetCoreSlim
+from .models.planet_slim_mlp import PlaNetCoreSlimMLP
 from .loss import PlaNetLoss
 from .data import PlaNetDataset, get_device
 from .utils import get_accelerator, last_ckp_path, save_model_and_scaler, dummy_planet_input
@@ -39,6 +40,7 @@ def collate_fun(batch: _TypeBatch) -> List[Tensor]:
 MAP_MODEL: Dict[str, Type[nn.Module]] = {
     "planet": PlaNetCore,
     "planet_slim": PlaNetCoreSlim,
+    "planet_slim_mlp": PlaNetCoreSlimMLP,
 }
 
 
