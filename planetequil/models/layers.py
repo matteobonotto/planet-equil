@@ -151,3 +151,25 @@ class MLPStack(nn.Module):
         for l in self.layers:
             x = l(x)
         return x
+
+
+class Conv1dNornAct(nn.Module):
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        kernel_size: int = 3,
+        padding: str = "same",
+    ):
+        super().__init__()
+        self.conv2d = nn.Conv1d(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel_size=kernel_size,
+            padding=padding,
+        )
+        self.norm = nn.BatchNorm1d(num_features=out_channels)
+        self.act = TrainableSwish()
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.act(self.norm(self.conv2d(x)))

@@ -217,7 +217,7 @@ class Decoder(nn.Module):
 
         x = self.conv(x).squeeze()
         return x
-    
+
 
 class DecoderMLP(nn.Module):
     def __init__(self, hidden_dim: int = 128, nr: int = 32, nz: int = 32):
@@ -230,28 +230,28 @@ class DecoderMLP(nn.Module):
         self.linear_2 = nn.Linear(in_features=hidden_dim, out_features=hidden_dim)
         self.norm_2 = nn.BatchNorm1d(num_features=hidden_dim)
         self.act_2 = TrainableSwish(beta=1.0)
-        self.linear_3 = nn.Linear(in_features=hidden_dim, out_features=hidden_dim)
-        # self.norm_3 = nn.BatchNorm1d(num_features=hidden_dim)
-        # self.act_3 = TrainableSwish(beta=1.0)
-        self.linear_4 = nn.Linear(in_features=hidden_dim, out_features=nr * nz)
-        # self.conv = nn.Conv2d(
-        #     in_channels=self.channels[-1],
-        #     out_channels=1,
-        #     kernel_size=(1, 1),
-        #     padding="same",
-        # )
+        self.linear_3 = nn.Linear(in_features=hidden_dim, out_features=nr * nz)
+        self.norm_3 = nn.BatchNorm1d(num_features=nr * nz)
+        self.act_3 = nn.Tanh()
+        # self.linear_4 = nn.Linear(in_features=hidden_dim, out_features=nr * nz)
+        self.conv = nn.Conv2d(
+            in_channels=1,
+            out_channels=1,
+            kernel_size=(1, 1),
+            padding="same",
+        )
 
     def forward(self, x_trunk: Tensor, x_branch: Tensor) -> Tensor:
         x = x_trunk * x_branch
         # x_skip = x
-        x = self.act_1(self.norm_1(self.linear_1(x)))# + x_skip
+        x = self.act_1(self.norm_1(self.linear_1(x)))  # + x_skip
         # x_skip = x
-        x = self.act_2(self.norm_2(self.linear_2(x)))# + x_skip
+        x = self.act_2(self.norm_2(self.linear_2(x)))  # + x_skip
         # x_skip = x
-        # x = self.act_3(self.norm_3(self.linear_3(x))) + x_skip
-        x = self.linear_4(x)
-        # return self.conv(x.view(-1, self.nz, self.nz))
-        return x.view(-1, self.nz, self.nz)
+        x = self.act_3(self.norm_3(self.linear_3(x)))  # + x_skip
+        # x = self.linear_4(x)
+        return self.conv(x.view(-1, self.nz, self.nz)[0, None, ...])
+        # return x.view(-1, self.nz, self.nz)
 
 
 class PlaNetCoreSlimMLP(nn.Module):

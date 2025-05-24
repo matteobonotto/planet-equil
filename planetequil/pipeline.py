@@ -11,7 +11,7 @@ from numpy.typing import NDArray
 
 from scipy import signal
 
-from .models.planet_conv import PlaNetCore
+from .models.planet import PlaNetCore
 from .config import PlaNetConfig
 from .data import compute_Grad_Shafranov_kernels
 from .loss import Gauss_kernel_5x5
@@ -52,6 +52,41 @@ class PlaNet:
         return [Tensor(x).to(device).to(dtype) for x in inputs_np]
 
     def __call__(
+        self,
+        measures: _TypeNpFloat | Tensor,
+        rr: _TypeNpFloat | Tensor,
+        zz: _TypeNpFloat | Tensor,
+    ) -> _TypeNpFloat | Tensor:
+        if isinstance(measures, Tensor):
+            return self._call_tensor(measures, rr, zz)
+        else:
+            return self._call_numpy(measures, rr, zz)
+
+    # def _parse_args_shape()
+
+    def _call_tensor(
+        self,
+        measures: Tensor,
+        rr: Tensor,
+        zz: Tensor,
+    ) -> Tensor:
+        if measures.ndim == 1:
+            measures = measures[None, :]
+        if rr.ndim == 2:
+            rr = np.tile(rr[None, ...], (measures.shape[0], 1, 1))
+        if zz.ndim == 2:
+            zz = np.tile(zz[None, ...], (measures.shape[0], 1, 1))
+
+        # prepare the inputs [simulating batch size of 1]
+        scaled_inputs = self.scaler.transform(measures)
+
+        # perfrom the forward pass
+        with torch.inference_mode():
+            flux = self.model(scaled_inputs, rr, zz)
+
+        return flux
+
+    def _call_numpy(
         self,
         measures: _TypeNpFloat,
         rr: _TypeNpFloat,
