@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 import numpy as np
 import torch
-from torch import nn
+from torch import nn, Tensor
 import pickle
 from lightning import Trainer
 import json
@@ -17,7 +17,7 @@ from .constants import DTYPE
 from .types import _TypeNpFloat
 
 
-def dummy_planet_input(
+def dummy_planet_input_np(
     batch_size: int = 32,
     nr: int = 64,
     nz: int = 64,
@@ -27,6 +27,20 @@ def dummy_planet_input(
         np.random.normal(size=(batch_size, n_measures)),
         np.random.normal(size=(batch_size, nr, nz)),
         np.random.normal(size=(batch_size, nr, nz)),
+    )
+
+
+def dummy_planet_input_tensor(
+    batch_size: int = 32,
+    nr: int = 64,
+    nz: int = 64,
+    n_measures: int = 302,
+    device: torch.device = torch.device("cpu"),
+) -> Tuple[Tensor, Tensor, Tensor]:
+    return (
+        torch.rand(size=(batch_size, n_measures), device=device, dtype=DTYPE),
+        torch.rand(size=(batch_size, nr, nz), device=device, dtype=DTYPE),
+        torch.rand(size=(batch_size, nr, nz), device=device, dtype=DTYPE),
     )
 
 
