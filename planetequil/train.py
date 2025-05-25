@@ -27,7 +27,8 @@ from .utils import (
     get_accelerator,
     last_ckp_path,
     save_model_and_scaler,
-    dummy_planet_input,
+    dummy_planet_input_np,
+    dummy_planet_input_tensor,
 )
 from .types import _TypeBatch
 from .constants import DTYPE
@@ -97,6 +98,7 @@ class DataModule(L.LightningDataModule):
 
 def get_scheduler(optimizer: torch.optim.Optimizer, trainer: Trainer) -> LRScheduler:
     scheduler = ExponentialLR(optimizer=optimizer, gamma=1 - 1.75e-3)
+    # scheduler = ExponentialLR(optimizer=optimizer, gamma=1 - 1.25e-3)
     # scheduler = LinearLR(
     #         optimizer,
     #         start_factor=1.0,
@@ -118,12 +120,13 @@ class LightningPlaNet(L.LightningModule):
         self.loss_module = PlaNetLoss(is_physics_informed=config.is_physics_informed)
 
     def summary(self) -> None:
-        input_data = tuple(
-            [
-                torch.tensor(x, device=self.device, dtype=DTYPE)
-                for x in dummy_planet_input()
-            ]
-        )
+        input_data = dummy_planet_input_tensor(device=self.device)
+        # tuple(
+        #     [
+        #         torch.tensor(x, device=self.device, dtype=DTYPE)
+        #         for x in dummy_planet_input()
+        #     ]
+        # )
         summary(self.model, input_data={"x": input_data})
 
     def forward(self, *args: Any) -> Tensor:
