@@ -97,7 +97,7 @@ class DataModule(L.LightningDataModule):
 
 
 def get_scheduler(optimizer: torch.optim.Optimizer, trainer: Trainer) -> LRScheduler:
-    scheduler = ExponentialLR(optimizer=optimizer, gamma=1 - 1.75e-3)
+    scheduler = ExponentialLR(optimizer=optimizer, gamma=1 - 1.85e-3)
     # scheduler = ExponentialLR(optimizer=optimizer, gamma=1 - 1.25e-3)
     # scheduler = LinearLR(
     #         optimizer,
