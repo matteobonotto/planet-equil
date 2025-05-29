@@ -129,7 +129,13 @@ class Scaler:
         self.scaler = StandardScaler()
 
     def fit(self, x: _TypeNpFloat) -> _TypeNpFloat:
-        return self.scaler.fit(x)
+        self.scaler.fit(x)
+        self.scaler._mean_tensor = torch.tensor(
+            self.scaler.mean_, dtype=self.dtype, device=self.device
+        )[None, ...]
+        self.scaler._std_tensor = torch.tensor(
+            self.scaler.scaler.var_**0.5, dtype=self.dtype, device=self.device
+        )[None, ...]
 
     def transform(self, x: _TypeNpFloat) -> _TypeNpFloat:
         return self.scaler.transform(x)
@@ -147,6 +153,7 @@ class PlaNetDataset(Dataset):  # type: ignore[type-arg]
         nr: int = 64,
         nz: int = 64,
         do_super_resolution: bool = False,
+        scale_inputs: bool = True,
     ) -> None:
         self.dtype = dtype
         self.device = get_device()
@@ -157,7 +164,10 @@ class PlaNetDataset(Dataset):  # type: ignore[type-arg]
         self.do_super_resolution = do_super_resolution
 
         data = read_h5_numpy(path)
-        self.inputs = self.scaler.fit_transform(data["measures"])
+        if scale_inputs:
+            self.inputs = self.scaler.fit_transform(data["measures"])
+        else:
+            self.inputs = data["measures"]
 
         self.flux = data["flux"]
         self.RR = data["RR_grid"]

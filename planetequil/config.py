@@ -5,6 +5,7 @@ from typing import Dict, Any, Optional
 
 @dataclass
 class PlaNetConfig:
+    model_name: str = "planet"
     hidden_dim: int = 128
     nr: int = 64
     nz: int = 64

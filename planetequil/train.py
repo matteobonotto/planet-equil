@@ -115,7 +115,7 @@ class LightningPlaNet(L.LightningModule):
     def __init__(self, config: Config):
         super().__init__()
         assert config.planet is not None, "must provide valid config.planet, got None"
-        self.model = MODELS[config.model_name](**config.planet.to_dict())
+        self.model = MODELS[config.planet.model_name](**config.planet.to_dict())
         self.summary()
         self.loss_module = PlaNetLoss(is_physics_informed=config.is_physics_informed)
 

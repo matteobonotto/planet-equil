@@ -1,29 +1,42 @@
 from __future__ import annotations
 from sklearn.preprocessing import StandardScaler
-from typing import Tuple, TypeAlias, List
+from typing import Tuple, TypeAlias, List, Optional
 import torch
-from torch import Tensor
+from torch import Tensor, nn
 import json
 from pathlib import Path
 import pickle
 import numpy as np
 from numpy.typing import NDArray
+from functools import singledispatchmethod
 
 from scipy import signal
 
-from .models.planet import PlaNetCore
+from .models import MODELS
 from .config import PlaNetConfig
-from .data import compute_Grad_Shafranov_kernels
-from .loss import Gauss_kernel_5x5
+from .data import Scaler, compute_Grad_Shafranov_kernels
+from .loss import Gauss_kernel_5x5, _compute_grad_shafranov_operator
 from .types import _TypeNpFloat
+from .utils import get_accelerator
+from .constants import DTYPE
 
 
 class PlaNet:
-    def __init__(self, model: PlaNetCore, scaler: StandardScaler):
-        self.model: PlaNetCore = model
+    def __init__(self, model: nn.Module, scaler: Scaler):
+        self.model: nn.Module = model
         self.set_device_and_dtype()
         self.model.eval()
-        self.scaler: StandardScaler = scaler
+        self.scaler: Scaler = scaler
+        # prepare the scaler to deal also with tensors
+        self.scaler._mean_tensor = torch.tensor(
+            scaler.scaler.mean_, dtype=self.dtype, device=self.device
+        )[None, ...]
+        self.scaler._std_tensor = torch.tensor(
+            self.scaler.scaler.var_**0.5, dtype=self.dtype, device=self.device
+        )[None, ...]
+        self.Gauss_kernel = torch.tensor(
+            Gauss_kernel_5x5, device=self.device, dtype=self.dtype
+        )
 
     def set_device_and_dtype(self) -> None:
         _, param = next(iter(self.model.named_parameters()))
@@ -31,7 +44,7 @@ class PlaNet:
         self.dtype = param.dtype
 
     @classmethod
-    def from_pretrained(cls, path: str) -> PlaNet:
+    def from_pretrained(cls, path: str, device: Optional[str] = None) -> PlaNet:
         print(f"Loading model from {path}")
         model_path = Path(path)
 
@@ -42,9 +55,10 @@ class PlaNet:
         scaler = pickle.load(open(model_path / Path("scaler.pkl"), "rb"))
 
         # load the core planet model
-        model = PlaNetCore(**config.to_dict())
+        device = torch.device(device) if device is not None else get_accelerator()
+        model = MODELS[config.model_name](**config.to_dict())
         model.load_state_dict(torch.load(model_path / Path("model.pt")))
-        return cls(model, scaler)
+        return cls(model.to(device), scaler)
 
     def _np_to_tensor(
         self, inputs_np: List[_TypeNpFloat], device: torch.device, dtype: torch.dtype
@@ -62,8 +76,6 @@ class PlaNet:
         else:
             return self._call_numpy(measures, rr, zz)
 
-    # def _parse_args_shape()
-
     def _call_tensor(
         self,
         measures: Tensor,
@@ -73,18 +85,35 @@ class PlaNet:
         if measures.ndim == 1:
             measures = measures[None, :]
         if rr.ndim == 2:
-            rr = np.tile(rr[None, ...], (measures.shape[0], 1, 1))
+            rr = torch.tile(rr[None, ...], (measures.shape[0], 1, 1))
         if zz.ndim == 2:
-            zz = np.tile(zz[None, ...], (measures.shape[0], 1, 1))
+            zz = torch.tile(zz[None, ...], (measures.shape[0], 1, 1))
 
         # prepare the inputs [simulating batch size of 1]
-        scaled_inputs = self.scaler.transform(measures)
+        scaled_inputs = self.scale_tensor(measures)
+        # q = measures.cpu().numpy()
+        # qq = self.scaler.transform(q)
 
-        # perfrom the forward pass
+        # self.scaler._std_tensor = torch.tensor(self.scaler.scaler.var_**0.5, dtype=self.dtype, device=self.device)[None, ...]
+        # scaled_inputs = measures - self.scaler._mean_tensor
+        # scaled_inputs = scaled_inputs / (self.scaler._std_tensor + 1e-7)
+
+        # m = measures.mean(0, keepdim=True)
+        # s = measures.std(0, unbiased=False, keepdim=True)
+        # x -= m
+        # x /= s
+
+        # (measures - self.scaler._mean_tensor) / (self.scaler._std_tensor + 1e-7)
+
         with torch.inference_mode():
-            flux = self.model(scaled_inputs, rr, zz)
+            flux = self.model((scaled_inputs, rr, zz))
 
         return flux
+
+    def scale_tensor(self, t: Tensor) -> Tensor:
+        t = t - self.scaler._mean_tensor
+        t = t / (self.scaler._std_tensor + 1e-7)
+        return t
 
     def _call_numpy(
         self,
@@ -117,7 +146,70 @@ class PlaNet:
 
         return flux.numpy().astype(measures.dtype)
 
-    def _compute_gs_ope(
+    def compute_gs_operator(
+        self,
+        flux: _TypeNpFloat | Tensor,
+        rr: _TypeNpFloat | Tensor,
+        zz: _TypeNpFloat | Tensor,
+    ) -> _TypeNpFloat | Tensor:
+        if isinstance(flux, Tensor):
+            return self.compute_gs_ope_numpy(flux, rr, zz)
+        else:
+            return self.compute_gs_ope_tensor(flux, rr, zz)
+
+    def compute_gs_ope_tensor(
+        self,
+        flux: _TypeNpFloat | Tensor,
+        rr: _TypeNpFloat | Tensor,
+        zz: _TypeNpFloat | Tensor,
+    ) -> _TypeNpFloat | Tensor:
+        assert (
+            flux.ndim == 3
+        ), f"For torch tensors, planet is compatible only with batched input. Expected 'flux.ndim=3', got {flux.ndim}"
+        assert (
+            rr.ndim == 3
+        ), f"For torch tensors, planet is compatible only with batched input. Expected 'rr.ndim=3', got {rr.ndim}"
+        assert (
+            zz.ndim == 3
+        ), f"For torch tensors, planet is compatible only with batched input. Expected 'zz.ndim=3', got {zz.ndim}"
+
+        n_batch = flux.shape[0]
+        L_ker = np.zeros(shape=(n_batch, 3, 3))
+        Df_dr_ker = np.zeros(shape=(n_batch, 3, 3))
+        for i_batch in range(rr.shape[0]):
+            L_ker_batch, Df_dr_ker_batch = compute_Grad_Shafranov_kernels(
+                rr[i_batch, ...], zz[i_batch, ...]
+            )
+            L_ker[i_batch, ...] = L_ker_batch
+            Df_dr_ker[i_batch, ...] = Df_dr_ker_batch
+        gs_ope = _compute_grad_shafranov_operator(
+            flux,
+            torch.tensor(L_ker, dtype=self.dtype, device=self.device),
+            torch.tensor(Df_dr_ker, dtype=self.dtype, device=self.device),
+            rr,
+            zz,
+            self.Gauss_kernel,
+        )
+        return gs_ope
+
+    def compute_gs_ope_numpy(
+        self,
+        flux: _TypeNpFloat,
+        rr: _TypeNpFloat,
+        zz: _TypeNpFloat,
+    ) -> _TypeNpFloat:
+        if flux.ndim == 1:
+            flux = flux[None, :]
+        if rr.ndim == 2:
+            rr = np.tile(rr[None, ...], (flux.shape[0], 1, 1))
+        if zz.ndim == 2:
+            zz = np.tile(zz[None, ...], (flux.shape[0], 1, 1))
+        if flux.shape[0] > 1:
+            return self._compute_gs_ope_numpy_batch(flux, rr, zz)
+        else:
+            return self._compute_gs_ope_numpy(flux, rr, zz)
+
+    def _compute_gs_ope_numpy(
         self, flux: _TypeNpFloat, rr: _TypeNpFloat, zz: _TypeNpFloat
     ) -> _TypeNpFloat:
         L_ker, Df_dr_ker = compute_Grad_Shafranov_kernels(rr, zz)
@@ -130,7 +222,7 @@ class PlaNet:
         beta = alfa / (hr**2 * hz**2)
         return signal.convolve(lhs_scipy * beta, Gauss_kernel_5x5, mode="same")
 
-    def _compute_gs_ope_batch(
+    def _compute_gs_ope_numpy_batch(
         self, flux: _TypeNpFloat, rr: _TypeNpFloat, zz: _TypeNpFloat
     ) -> _TypeNpFloat:
         gs_ope = np.zeros_like(flux[:, 1:-1, 1:-1])
@@ -139,11 +231,3 @@ class PlaNet:
                 flux[i_batch, ...], rr[i_batch, ...], zz[i_batch, ...]
             )
         return gs_ope
-
-    def compute_gs_operator(
-        self, flux: _TypeNpFloat, rr: _TypeNpFloat, zz: _TypeNpFloat
-    ) -> _TypeNpFloat:
-        if rr.ndim > 2:
-            return self._compute_gs_ope_batch(flux, rr, zz)
-        else:
-            return self._compute_gs_ope(flux, rr, zz)

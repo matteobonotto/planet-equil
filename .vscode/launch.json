@@ -20,6 +20,15 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args" : ["-c", "config/config.yml"]
+        }       ,
+        {
+            "name": "create dataset",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/planetequil/scripts/create_dataset.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args" : ["--sample"]
         }
     ]
 }

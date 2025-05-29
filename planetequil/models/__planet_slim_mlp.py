@@ -261,8 +261,10 @@ class PlaNetCoreSlimMLP(nn.Module):
         nr: int = 64,
         nz: int = 64,
         n_measures: int = 302,
+        name: str = "",
     ):
         super().__init__()
+        self.name = name
         self.config = PlaNetConfig(
             nr=nr, nz=nz, hidden_dim=hidden_dim, n_measures=n_measures
         )
