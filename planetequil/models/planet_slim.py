@@ -179,7 +179,7 @@ class DecoderMLP(nn.Module):
         # x = self.act_3(self.norm_3(self.linear_3(x)))  # + x_skip
         x = self.linear_4(x)
         # return self.conv(x.view(-1, self.nz, self.nz)[0, None, ...])
-        return x.view(-1, self.nz, self.nz)
+        return x.view(-1, self.nz, self.nz).squeeze()
 
 
 class PlaNetCoreSlim(nn.Module):

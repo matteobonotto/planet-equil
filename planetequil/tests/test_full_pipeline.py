@@ -5,7 +5,7 @@ import pytest
 from planetequil.config import Config
 from planetequil.train import main_train
 from planetequil import PlaNet
-from planetequil.utils import dummy_planet_input
+from planetequil.utils import dummy_planet_input_tensor, dummy_planet_input_np
 
 
 @pytest.mark.slow
@@ -13,7 +13,7 @@ def test_full_pipe():
     config = Config()
     config.epochs = 2
     config.log_to_wandb = False
-    config.dataset_path = "planet/tests/data/iter_like_data_sample.h5"
+    config.dataset_path = "planetequil/tests/data/iter_like_data_sample.h5"
     print(config)
 
     if os.path.exists(config.save_path):
@@ -25,8 +25,8 @@ def test_full_pipe():
     ### load pretrained model
     pipe = PlaNet.from_pretrained(config.save_path)
 
-    ### perform inference
-    measures, rr, zz = dummy_planet_input()
+    ### perform inference (numpy)
+    measures, rr, zz = dummy_planet_input_np()
     flux = pipe(measures, rr, zz)
     gs_ope = pipe.compute_gs_operator(flux, rr, zz)
 
@@ -36,3 +36,6 @@ def test_full_pipe():
     ### remove artifacts
     if os.path.exists(config.save_path):
         shutil.rmtree(config.save_path)
+
+
+test_full_pipe()

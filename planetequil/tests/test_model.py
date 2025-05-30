@@ -1,5 +1,5 @@
 import torch
-from planetequil.model import TrunkNet, BranchNet, Decoder, PlaNetCore
+from planetequil.models.planet import TrunkNet, BranchNet, DecoderConv, PlaNetCore
 
 DTYPE = torch.float32
 
@@ -31,7 +31,7 @@ def test_TrunkNet():
     assert out_trunk.shape == (8, 128)
 
 
-test_TrunkNet()
+# test_TrunkNet()
 
 
 def test_PlaNetCore():

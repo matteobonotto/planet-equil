@@ -31,6 +31,7 @@ torch = "^2.7.0"
 h5py = "^3.13.0"
 pytest = "^8.3.5"
 wandb = "^0.19.10"
+safetensors = "^0.5.3"
 
 [tool.poetry.group.dev.dependencies]
 setuptools = "^69.5.1"  # Ensures proper package discovery

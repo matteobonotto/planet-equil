@@ -4,7 +4,7 @@ import torch
 from pathlib import Path
 from torch.utils.data import DataLoader, Subset
 from multiprocessing import cpu_count
-
+import json
 from torch import Tensor, nn
 from torchinfo import summary
 from torch.optim.lr_scheduler import (
@@ -13,7 +13,7 @@ from torch.optim.lr_scheduler import (
     ReduceLROnPlateau,
     LRScheduler,
 )
-
+from safetensors.torch import save_file 
 import lightning as L
 from lightning import Trainer
 from lightning.pytorch.callbacks import ModelCheckpoint, Callback, TQDMProgressBar
@@ -22,12 +22,10 @@ from lightning.pytorch.loggers import WandbLogger, Logger
 from .config import Config
 from .models.models import MODELS
 from .loss import PlaNetLoss
-from .data import PlaNetDataset, get_device
+from .data import PlaNetDataset, Scaler
 from .utils import (
     get_accelerator,
     last_ckp_path,
-    save_model_and_scaler,
-    dummy_planet_input_np,
     dummy_planet_input_tensor,
 )
 from .types import _TypeBatch
@@ -109,6 +107,33 @@ def get_scheduler(optimizer: torch.optim.Optimizer, trainer: Trainer) -> LRSched
     #     )
     # scheduler = ReduceLROnPlateau(optimizer)
     return scheduler
+
+
+
+def save_model_and_scaler(
+    planet_model: nn.Module, scaler: Scaler, config: Config
+) -> None:
+    save_dir = Path(config.save_path)
+    save_dir.mkdir(exist_ok=True, parents=True)
+    print(f"Saving model and scaler to {save_dir}")
+
+    # save model config
+    json.dump(config.planet.to_dict(), open(save_dir / Path("config.json"), "w"))
+
+    # save model
+    planet_model.eval()
+    # torch.save(planet_model.state_dict(), save_dir / Path("model.pt"))
+    save_file(planet_model.state_dict(), save_dir / Path("model.safetensors"))
+
+    # save scaler
+    scaler_params = {
+        "mean" : (scaler.mean).tolist(), 
+        "std" : (scaler.std).tolist(), 
+    }
+    json.dump(scaler_params, open(save_dir / Path("scaler.json"), 'w'))
+    # with open(save_dir / Path("scaler.pkl"), "wb") as f:
+    #     pickle.dump(scaler, f)
+
 
 
 class LightningPlaNet(L.LightningModule):
