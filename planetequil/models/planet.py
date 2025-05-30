@@ -6,7 +6,7 @@ import torch
 from torch import Tensor, nn
 
 from ..config import PlaNetConfig
-from .models.layers import Conv2dNornAct, TrainableSwish
+from .layers import Conv2dNornAct, TrainableSwish
 
 
 class TrunkNet(nn.Module):
@@ -114,7 +114,7 @@ class BranchNet(nn.Module):
         return x
 
 
-class Decoder(nn.Module):
+class DecoderConv(nn.Module):
     def __init__(self, hidden_dim: int = 128, nr: int = 32, nz: int = 32):
         super().__init__()
         assert nr % 2 == 0, f"nr must be a power of 2, got {nr}"
@@ -198,14 +198,16 @@ class PlaNetCore(nn.Module):
         nr: int = 64,
         nz: int = 64,
         n_measures: int = 302,
+        model_name: str = "",
     ):
         super().__init__()
+        self.model_name = model_name
         self.config = PlaNetConfig(
             nr=nr, nz=nz, hidden_dim=hidden_dim, n_measures=n_measures
         )
         self.trunk = TrunkNet(hidden_dim=hidden_dim, nr=nr, nz=nz)
         self.branch = BranchNet(hidden_dim=hidden_dim, in_dim=n_measures)
-        self.decoder = Decoder(hidden_dim=hidden_dim, nr=nr, nz=nz)
+        self.decoder = DecoderConv(hidden_dim=hidden_dim, nr=nr, nz=nz)
 
     def forward(self, x: Tuple[Tensor, Tensor, Tensor]) -> Tensor:
         x_meas, x_r, x_z = x

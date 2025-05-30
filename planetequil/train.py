@@ -1,23 +1,35 @@
-from typing import List, Tuple, Any, Optional, Dict
+from typing import List, Tuple, Any, Optional, Dict, Type
 import random
 import torch
 from pathlib import Path
 from torch.utils.data import DataLoader, Subset
 from multiprocessing import cpu_count
-
+import json
 from torch import Tensor, nn
-
+from torchinfo import summary
+from torch.optim.lr_scheduler import (
+    ExponentialLR,
+    LinearLR,
+    ReduceLROnPlateau,
+    LRScheduler,
+)
+from safetensors.torch import save_file 
 import lightning as L
 from lightning import Trainer
 from lightning.pytorch.callbacks import ModelCheckpoint, Callback, TQDMProgressBar
 from lightning.pytorch.loggers import WandbLogger, Logger
 
 from .config import Config
-from .model import PlaNetCore
+from .models.models import MODELS
 from .loss import PlaNetLoss
-from .data import PlaNetDataset, get_device
-from .utils import get_accelerator, last_ckp_path, save_model_and_scaler
+from .data import PlaNetDataset, Scaler
+from .utils import (
+    get_accelerator,
+    last_ckp_path,
+    dummy_planet_input_tensor,
+)
 from .types import _TypeBatch
+from .constants import DTYPE
 
 
 def collate_fun(batch: _TypeBatch) -> List[Tensor]:
@@ -64,6 +76,7 @@ class DataModule(L.LightningDataModule):
             collate_fn=collate_fun,
             num_workers=self.num_workers,
             persistent_workers=True if self.num_workers > 0 else False,
+            drop_last=True,
         )
 
     def val_dataloader(self) -> DataLoader[Any]:
@@ -74,18 +87,72 @@ class DataModule(L.LightningDataModule):
             collate_fn=collate_fun,
             num_workers=self.num_workers,
             persistent_workers=True if self.num_workers > 0 else False,
+            drop_last=True,
         )
 
     def setup(self, stage: Optional[Any] = None) -> None:
         pass
 
 
+def get_scheduler(optimizer: torch.optim.Optimizer, trainer: Trainer) -> LRScheduler:
+    scheduler = ExponentialLR(optimizer=optimizer, gamma=1 - 1.85e-3)
+    # scheduler = ExponentialLR(optimizer=optimizer, gamma=1 - 1.25e-3)
+    # scheduler = LinearLR(
+    #         optimizer,
+    #         start_factor=1.0,
+    #         end_factor=0.02,
+    #         total_iters=(
+    #             5 if trainer.max_epochs is None else trainer.max_epochs
+    #         ),
+    #     )
+    # scheduler = ReduceLROnPlateau(optimizer)
+    return scheduler
+
+
+
+def save_model_and_scaler(
+    planet_model: nn.Module, scaler: Scaler, config: Config
+) -> None:
+    save_dir = Path(config.save_path)
+    save_dir.mkdir(exist_ok=True, parents=True)
+    print(f"Saving model and scaler to {save_dir}")
+
+    # save model config
+    json.dump(config.planet.to_dict(), open(save_dir / Path("config.json"), "w"))
+
+    # save model
+    planet_model.eval()
+    # torch.save(planet_model.state_dict(), save_dir / Path("model.pt"))
+    save_file(planet_model.state_dict(), save_dir / Path("model.safetensors"))
+
+    # save scaler
+    scaler_params = {
+        "mean" : (scaler.mean).tolist(), 
+        "std" : (scaler.std).tolist(), 
+    }
+    json.dump(scaler_params, open(save_dir / Path("scaler.json"), 'w'))
+    # with open(save_dir / Path("scaler.pkl"), "wb") as f:
+    #     pickle.dump(scaler, f)
+
+
+
 class LightningPlaNet(L.LightningModule):
     def __init__(self, config: Config):
         super().__init__()
         assert config.planet is not None, "must provide valid config.planet, got None"
-        self.model = PlaNetCore(**config.planet.to_dict())
+        self.model = MODELS[config.planet.model_name](**config.planet.to_dict())
+        self.summary()
         self.loss_module = PlaNetLoss(is_physics_informed=config.is_physics_informed)
+
+    def summary(self) -> None:
+        input_data = dummy_planet_input_tensor(device=self.device)
+        # tuple(
+        #     [
+        #         torch.tensor(x, device=self.device, dtype=DTYPE)
+        #         for x in dummy_planet_input()
+        #     ]
+        # )
+        summary(self.model, input_data={"x": input_data})
 
     def forward(self, *args: Any) -> Tensor:
         return self.model(*args)
@@ -127,14 +194,7 @@ class LightningPlaNet(L.LightningModule):
 
     def configure_optimizers(self) -> Any:
         optimizer = torch.optim.AdamW(self.parameters(), lr=1e-3)
-        scheduler = torch.optim.lr_scheduler.LinearLR(
-            optimizer,
-            start_factor=1.0,
-            end_factor=0.02,
-            total_iters=(
-                5 if self.trainer.max_epochs is None else self.trainer.max_epochs
-            ),
-        )
+        scheduler = get_scheduler(optimizer, self.trainer)
         return [optimizer], [{"scheduler": scheduler, "interval": "epoch"}]
 
 

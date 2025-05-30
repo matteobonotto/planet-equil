@@ -10,16 +10,26 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
+            "args": ["PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT","10"],
             "justMyCode": false
         }        ,
         {
             "name": "main train",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/planet/scripts/main_train.py",
+            "program": "${workspaceFolder}/planetequil/scripts/main_train.py",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args" : ["-c", "planet/tests/data/config.yml"]
+            "args" : ["-c", "config/config.yml"]
+        }       ,
+        {
+            "name": "create dataset",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/planetequil/scripts/create_dataset.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args" : ["--sample"]
         }
     ]
 }

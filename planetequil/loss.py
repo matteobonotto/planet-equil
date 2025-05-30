@@ -78,7 +78,7 @@ class GSOperatorLoss(nn.Module):
         super().__init__()
         self.mse = nn.MSELoss()
         self.register_buffer(
-            "Gauss_kernel", torch.tensor(Gauss_kernel_3x3, dtype=torch.float32)
+            "Gauss_kernel", torch.tensor(Gauss_kernel_5x5, dtype=torch.float32)
         )
 
     def forward(

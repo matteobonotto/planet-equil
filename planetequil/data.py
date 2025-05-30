@@ -1,7 +1,9 @@
+from __future__ import annotations
 import random
 import numpy as np
-from numpy import ndarray
+from pathlib import Path
 from functools import partial
+import json
 from typing import Optional, Tuple, Any, List
 import torch
 from torch.utils.data import Dataset
@@ -11,9 +13,10 @@ from sklearn.preprocessing import StandardScaler
 import h5py
 from scipy.interpolate import RegularGridInterpolator
 
-from .utils import read_h5_numpy
+from .utils import read_h5_numpy, get_device, tensor_to_numpy
 from .types import _TypeNpFloat
-from .constants import RANDOM_SEED
+from .constants import RANDOM_SEED, DTYPE
+
 
 random.seed(RANDOM_SEED)
 
@@ -115,21 +118,100 @@ def _to_tensor(
     return inputs_t
 
 
-def get_device() -> torch.device:
-    if torch.cuda.is_available():
-        return torch.device("cuda:0")
-    elif torch.backends.mps.is_available():
-        return torch.device("mps")
-    else:
-        return torch.device("cpu")
-
-
 class Scaler:
+    """Custom implementation of sklearn standard scaler that automatically handles
+    both numpy arrays and torch tensors, and allow for inplace scaling."""
+
+    mean: _TypeNpFloat
+    std: _TypeNpFloat
+    mean_tensor: Tensor
+    std_tensor: Tensor
+    device: torch.device = get_device()
+    not_fitted: bool = True
+    eps: float = 1e-7
+
+    def __init__(
+        self, mean: Optional[_TypeNpFloat] = None, std: Optional[_TypeNpFloat] = None
+    ) -> None:
+        if mean is not None:
+            self.mean = mean
+            self.std = std
+            self.mean_tensor = torch.tensor(mean, dtype=DTYPE)[None, ...]
+            self.std_tensor = torch.tensor(std, dtype=DTYPE)[None, ...]
+            self.not_fitted = False
+
+    def set_device(self, device: torch.device | str) -> None:
+        self.device = torch.device(device) if isinstance(device, str) else device
+        self.mean_tensor = self.mean_tensor.to(device)
+        self.std_tensor = self.std_tensor.to(device)
+
+    def transform(
+        self, x: _TypeNpFloat | Tensor, inplace: bool = False
+    ) -> _TypeNpFloat | Tensor:
+        if self.not_fitted:
+            raise ValueError("Scaler not fitted yet, please run .fit()")
+        if isinstance(x, np.ndarray):
+            return self._transform_ndarray(x, inplace)
+        if isinstance(x, Tensor):
+            return self._transform_tensor(x, inplace)
+
+    def _transform_ndarray(
+        self, x: _TypeNpFloat, inplace: bool = False
+    ) -> _TypeNpFloat:
+        if inplace:
+            x -= self.mean
+            x /= self.std + self.eps
+        else:
+            x = x - self.mean
+            x = x / (self.std + self.eps)
+        return x
+
+    def _transform_tensor(self, x: Tensor, inplace: bool = False) -> Tensor:
+        if inplace:
+            x -= self.mean_tensor
+            x /= self.std_tensor + self.eps
+        else:
+            x = x - self.mean_tensor
+            x = x / (self.std_tensor + self.eps)
+        return x
+
+    def fit(self, x: _TypeNpFloat | Tensor) -> None:
+        self.not_fitted = False
+        if isinstance(x, np.ndarray):
+            self.mean = x.mean(axis=0)
+            self.std = x.std(axis=0)
+            self.mean_tensor = torch.tensor(self.mean, device=self.device, dtype=DTYPE)
+            self.std_tensor = torch.tensor(self.std, device=self.device, dtype=DTYPE)
+        if isinstance(x, Tensor):
+            self.mean_tensor = x.mean(0, keepdim=True)
+            self.std_tensor = x.std(0, unbiased=False, keepdim=True)
+            self.mean = tensor_to_numpy(self.mean_tensor)
+            self.std = tensor_to_numpy(self.std_tensor)
+
+    def fit_transform(self, x: _TypeNpFloat | Tensor) -> _TypeNpFloat | Tensor:
+        self.fit(x)
+        return self.transform(x)
+
+    @classmethod
+    def from_config(cls, path: str | Path) -> Scaler:
+        if not isinstance(path, Path):
+            path = Path(path)
+        config = {k: np.array(v) for k, v in json.load(open(path, "r")).items()}
+        return cls(**config)
+
+
+class Scaler_:
     def __init__(self) -> None:
         self.scaler = StandardScaler()
 
     def fit(self, x: _TypeNpFloat) -> _TypeNpFloat:
-        return self.scaler.fit(x)
+        self.scaler.fit(x)
+        self.scaler._mean_tensor = torch.tensor(
+            self.scaler.mean_, dtype=self.dtype, device=self.device
+        )[None, ...]
+        self.scaler._std_tensor = torch.tensor(
+            self.scaler.scaler.var_**0.5, dtype=self.dtype, device=self.device
+        )[None, ...]
 
     def transform(self, x: _TypeNpFloat) -> _TypeNpFloat:
         return self.scaler.transform(x)
@@ -147,6 +229,7 @@ class PlaNetDataset(Dataset):  # type: ignore[type-arg]
         nr: int = 64,
         nz: int = 64,
         do_super_resolution: bool = False,
+        scale_inputs: bool = True,
     ) -> None:
         self.dtype = dtype
         self.device = get_device()
@@ -157,7 +240,10 @@ class PlaNetDataset(Dataset):  # type: ignore[type-arg]
         self.do_super_resolution = do_super_resolution
 
         data = read_h5_numpy(path)
-        self.inputs = self.scaler.fit_transform(data["measures"])
+        if scale_inputs:
+            self.inputs = self.scaler.fit_transform(data["measures"])
+        else:
+            self.inputs = data["measures"]
 
         self.flux = data["flux"]
         self.RR = data["RR_grid"]
@@ -221,11 +307,14 @@ class PlaNetDataset(Dataset):  # type: ignore[type-arg]
                     zz=zz[1:-1, 1:-1],
                 )
             else:
-                rhs = np.zeros_like(rhs[1:-1, 1:-1])
+                rhs = np.zeros_like(flux[1:-1, 1:-1])
             RR = rr
             ZZ = zz
         else:
-            rhs = rhs[1:-1, 1:-1]
+            if self.is_physics_informed:
+                rhs = rhs[1:-1, 1:-1]
+            else:
+                rhs = np.zeros_like(flux[1:-1, 1:-1])
 
         if self.is_physics_informed:
             L_ker, Df_ker = compute_Grad_Shafranov_kernels(RR=RR, ZZ=ZZ)

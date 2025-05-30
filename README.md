@@ -22,6 +22,14 @@ poetry install
 ## Data
 To train and test PlaNet you can use the dataset available at [this repo](https://github.com/matteobonotto/ITERlike_equilibrium_dataset.git), containing ~85k equilibria of an ITER-like devices. All the equilibria have been computed numerically using the free-boundary Grad-Shafranov solver FRIDA, which is publicly available [here](https://github.com/matteobonotto/frida).
 
+The data can be downloaded and stored in a PlaNet-compatible format (see `1_dataset_creation.ipynb` for further info about the format) using the `planetequil/scripts/create_dataset.py` script. To download a sample dataset (~8.2K equilibria), run:
+```shell
+python planetequil/scripts/create_dataset.py
+```
+to download the full dataset, run:
+```shell
+python planetequil/scripts/create_dataset.py --full
+```
 
 ## Tutorials
 There are tutorial notebooks available to get started with `planet`:
