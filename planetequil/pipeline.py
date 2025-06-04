@@ -76,13 +76,6 @@ class PlaNet:
         self.set_device_and_dtype()
         self.model.eval()
         self.scaler: Scaler = scaler
-        # prepare the scaler to deal also with tensors
-        # self.scaler._mean_tensor = torch.tensor(
-        #     scaler.scaler.mean_, dtype=self.dtype, device=self.device
-        # )[None, ...]
-        # self.scaler._std_tensor = torch.tensor(
-        #     self.scaler.scaler.var_**0.5, dtype=self.dtype, device=self.device
-        # )[None, ...]
         self.Gauss_kernel = torch.tensor(
             Gauss_kernel_5x5, device=self.device, dtype=self.dtype
         )

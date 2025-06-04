@@ -46,6 +46,11 @@ class TrunkNet(nn.Module):
             return grid[:, :, 0]
         else:
             return grid[:, 0, :]
+        # return torch.cond(
+        #         (grid[0, 0, 0] != grid[0, 1, 0]),
+        #         lambda: grid[:, :, 0],
+        #         lambda: grid[:, 0, :]
+        #     )
 
     def forward(self, x_r: Tensor, x_z: Tensor) -> Tensor:
         # branch for x_r

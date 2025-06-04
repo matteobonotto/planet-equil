@@ -7,7 +7,7 @@ epochs: 2000
 log_to_wandb: True
 wandb_project: planet
 save_checkpoints: true
-resume_from_checkpoint: false
+resume_from_checkpoint: true
 num_workers: 0
 planet_config:
   model_name: planet_slim_mlp
