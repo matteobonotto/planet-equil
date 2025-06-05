@@ -58,7 +58,7 @@ def jit_compile_model(
         n_measures=model.config.n_measures,
         device=device,
     )
-    traced_model = torch.jit.trace(model, example_kwarg_inputs={"x":dummy_inputs})
+    traced_model = torch.jit.trace(model, example_kwarg_inputs={"x": dummy_inputs})
     traced_model.config = model.config
     return traced_model
 

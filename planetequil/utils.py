@@ -93,7 +93,6 @@ def last_ckp_path(ckpt_path: str | Path) -> Path:
     return latest
 
 
-
 def get_accelerator() -> str:
     if torch.backends.mps.is_available():
         return "mps"

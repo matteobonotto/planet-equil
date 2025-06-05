@@ -13,7 +13,7 @@ from torch.optim.lr_scheduler import (
     ReduceLROnPlateau,
     LRScheduler,
 )
-from safetensors.torch import save_file 
+from safetensors.torch import save_file
 import lightning as L
 from lightning import Trainer
 from lightning.pytorch.callbacks import ModelCheckpoint, Callback, TQDMProgressBar
@@ -109,7 +109,6 @@ def get_scheduler(optimizer: torch.optim.Optimizer, trainer: Trainer) -> LRSched
     return scheduler
 
 
-
 def save_model_and_scaler(
     planet_model: nn.Module, scaler: Scaler, config: Config
 ) -> None:
@@ -127,13 +126,12 @@ def save_model_and_scaler(
 
     # save scaler
     scaler_params = {
-        "mean" : (scaler.mean).tolist(), 
-        "std" : (scaler.std).tolist(), 
+        "mean": (scaler.mean).tolist(),
+        "std": (scaler.std).tolist(),
     }
-    json.dump(scaler_params, open(save_dir / Path("scaler.json"), 'w'))
+    json.dump(scaler_params, open(save_dir / Path("scaler.json"), "w"))
     # with open(save_dir / Path("scaler.pkl"), "wb") as f:
     #     pickle.dump(scaler, f)
-
 
 
 class LightningPlaNet(L.LightningModule):
