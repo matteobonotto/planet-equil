@@ -87,8 +87,12 @@ def interp_fun(
 
 
 def compute_Grad_Shafranov_kernels(
-    RR: _TypeNpFloat, ZZ: _TypeNpFloat
-) -> Tuple[_TypeNpFloat, _TypeNpFloat]:
+    RR: _TypeNpFloat | Tensor, ZZ: _TypeNpFloat | Tensor
+) -> Tuple[_TypeNpFloat | Tensor, _TypeNpFloat | Tensor]:
+    return_tensor = False
+    if isinstance(RR, Tensor):
+        device = RR.device()
+        return_tensor = True
     hr = RR[1, 2] - RR[1, 1]
     hz = ZZ[2, 1] - ZZ[1, 1]
     alfa = -2 * (hr**2 + hz**2)
@@ -100,7 +104,13 @@ def compute_Grad_Shafranov_kernels(
         / (2 * hr * alfa)
         * (hr**2 * hz**2)
     )
-    return Laplace_kernel, Df_dr_kernel
+    if return_tensor:
+        return (
+            torch.tensor(Laplace_kernel, device=device, dtype=DTYPE),
+            torch.tensor(Df_dr_kernel, device=device, dtype=DTYPE),
+        )
+    else:
+        return Laplace_kernel, Df_dr_kernel
 
 
 def _to_tensor(
@@ -200,24 +210,24 @@ class Scaler:
         return cls(**config)
 
 
-class Scaler_:
-    def __init__(self) -> None:
-        self.scaler = StandardScaler()
+# class Scaler_:
+#     def __init__(self) -> None:
+#         self.scaler = StandardScaler()
 
-    def fit(self, x: _TypeNpFloat) -> _TypeNpFloat:
-        self.scaler.fit(x)
-        self.scaler._mean_tensor = torch.tensor(
-            self.scaler.mean_, dtype=self.dtype, device=self.device
-        )[None, ...]
-        self.scaler._std_tensor = torch.tensor(
-            self.scaler.scaler.var_**0.5, dtype=self.dtype, device=self.device
-        )[None, ...]
+#     def fit(self, x: _TypeNpFloat) -> _TypeNpFloat:
+#         self.scaler.fit(x)
+#         self.scaler._mean_tensor = torch.tensor(
+#             self.scaler.mean_, dtype=self.dtype, device=self.device
+#         )[None, ...]
+#         self.scaler._std_tensor = torch.tensor(
+#             self.scaler.scaler.var_**0.5, dtype=self.dtype, device=self.device
+#         )[None, ...]
 
-    def transform(self, x: _TypeNpFloat) -> _TypeNpFloat:
-        return self.scaler.transform(x)
+#     def transform(self, x: _TypeNpFloat) -> _TypeNpFloat:
+#         return self.scaler.transform(x)
 
-    def fit_transform(self, x: _TypeNpFloat) -> _TypeNpFloat:
-        return self.scaler.fit_transform(x)
+#     def fit_transform(self, x: _TypeNpFloat) -> _TypeNpFloat:
+#         return self.scaler.fit_transform(x)
 
 
 class PlaNetDataset(Dataset):  # type: ignore[type-arg]

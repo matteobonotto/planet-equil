@@ -38,4 +38,4 @@ def test_full_pipe():
         shutil.rmtree(config.save_path)
 
 
-test_full_pipe()
+# test_full_pipe()

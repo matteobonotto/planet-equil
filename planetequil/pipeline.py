@@ -22,13 +22,15 @@ from .utils import get_accelerator, dummy_planet_input_tensor
 from .constants import DTYPE
 
 
-def load_model_safetensors(model: nn.Module, path: str | Path, device: torch.device):
+def load_model_safetensors(
+    model: nn.Module, path: str | Path, device: torch.device
+) -> None:
     """Given a model, loads the layers from safetensors"""
     if not isinstance(path, Path):
         path = Path(path)
     try:
         state_dict: Dict[str, Tensor] = {}
-        with safe_open(path, framework="pt", device=device) as f:
+        with safe_open(path, framework="pt", device=str(device)) as f:
             for k in f.keys():
                 state_dict[k] = f.get_tensor(k)
         model.load_state_dict(state_dict)
@@ -48,19 +50,19 @@ def validate_device(model: nn.Module, device: torch.device) -> None:
         model.to(device)
 
 
-def jit_compile_model(
-    model: nn.Module, device: torch.device, dtype: torch.dtype
-) -> nn.Module:
-    dummy_inputs = dummy_planet_input_tensor(
-        batch_size=32,
-        nr=model.config.nr,
-        nz=model.config.nz,
-        n_measures=model.config.n_measures,
-        device=device,
-    )
-    traced_model = torch.jit.trace(model, example_kwarg_inputs={"x": dummy_inputs})
-    traced_model.config = model.config
-    return traced_model
+# def jit_compile_model(
+#     model: nn.Module, device: torch.device, dtype: torch.dtype
+# ) -> nn.Module:
+#     dummy_inputs = dummy_planet_input_tensor(
+#         batch_size=32,
+#         nr=model.config.nr,
+#         nz=model.config.nz,
+#         n_measures=model.config.n_measures,
+#         device=device,
+#     )
+#     traced_model = torch.jit.trace(model, example_kwarg_inputs={"x": dummy_inputs})
+#     traced_model.config = model.config
+#     return traced_model
 
 
 class PlaNet:
@@ -73,14 +75,19 @@ class PlaNet:
         if fast_inference is not None:
             self.fast_inference = fast_inference
         self.model: nn.Module = model
-        self.set_device_and_dtype()
+        self.get_model_device_and_dtype()
         self.model.eval()
         self.scaler: Scaler = scaler
+        scaler.set_device(self.device)
         self.Gauss_kernel = torch.tensor(
             Gauss_kernel_5x5, device=self.device, dtype=self.dtype
         )
 
-    def set_device_and_dtype(self) -> None:
+    def set_device(self, device: torch.device) -> None:
+        self.scaler.set_device(device)
+        self.model.to(device)
+
+    def get_model_device_and_dtype(self) -> None:
         _, param = next(iter(self.model.named_parameters()))
         self.device = param.device
         self.dtype = param.dtype
@@ -91,28 +98,25 @@ class PlaNet:
         path: str,
         device: Optional[str] = None,
         fast_inference: Optional[bool] = None,
-        compile_model: Optional[bool] = None,
     ) -> PlaNet:
         print(f"Loading model from {path}")
         model_path = Path(path)
-        device = torch.device(device) if device is not None else get_accelerator()
+        device_ = get_accelerator() if device is None else torch.device(device)
 
         # load scaler (already fitted during training)
-        # scaler = pickle.load(open(model_path / Path("scaler.pkl"), "rb"))
         scaler = Scaler.from_config(f"{path}/scaler.json")
-        scaler.set_device(device)
+        scaler.set_device(device_)
 
         # load the core planet model
         config = PlaNetConfig(**json.load(open(model_path / Path("config.json"), "r")))
         model = MODELS[config.model_name](**config.to_dict())
         load_model_safetensors(
-            model=model, path=model_path / Path("model.safetensors"), device=device
+            model=model, path=model_path / Path("model.safetensors"), device=device_
         )
-        validate_device(model=model, device=device)
-        if compile_model:
-            model = jit_compile_model(model, device=device, dtype=DTYPE)
-        # model.load_state_dict(torch.load(model_path / Path("model.pt")))
-        return cls(model=model.to(device), scaler=scaler, fast_inference=fast_inference)
+        validate_device(model=model, device=device_)
+        return cls(
+            model=model.to(device_), scaler=scaler, fast_inference=fast_inference
+        )
 
     @staticmethod
     def _np_to_tensor(
@@ -128,10 +132,14 @@ class PlaNet:
         rr: _TypeNpFloat | Tensor,
         zz: _TypeNpFloat | Tensor,
     ) -> _TypeNpFloat | Tensor:
-        if isinstance(measures, Tensor):
-            return self._call_tensor(measures, rr, zz)
-        else:
+        if isinstance(measures, np.ndarray):
+            message = "all inputs must be of type np.ndarray"
+            assert isinstance(rr, np.ndarray) and isinstance(zz, np.ndarray), message
             return self._call_numpy(measures, rr, zz)
+        else:
+            message = "all inputs must be of type torch.Tensor"
+            assert isinstance(rr, Tensor) and isinstance(zz, Tensor), message
+            return self._call_tensor(measures, rr, zz)
 
     def _call_tensor(
         self,
@@ -190,16 +198,20 @@ class PlaNet:
         zz: _TypeNpFloat | Tensor,
     ) -> _TypeNpFloat | Tensor:
         if isinstance(flux, np.ndarray):
+            message = "all inputs must be of type np.ndarray"
+            assert isinstance(rr, np.ndarray) and isinstance(zz, np.ndarray), message
             return self.compute_gs_ope_numpy(flux, rr, zz)
         else:
+            message = "all inputs must be of type torch.Tensor"
+            assert isinstance(rr, Tensor) and isinstance(zz, Tensor), message
             return self.compute_gs_ope_tensor(flux, rr, zz)
 
     def compute_gs_ope_tensor(
         self,
-        flux: _TypeNpFloat | Tensor,
-        rr: _TypeNpFloat | Tensor,
-        zz: _TypeNpFloat | Tensor,
-    ) -> _TypeNpFloat | Tensor:
+        flux: Tensor,
+        rr: Tensor,
+        zz: Tensor,
+    ) -> Tensor:
         assert (
             flux.ndim == 3
         ), f"For torch tensors, planet is compatible only with batched input. Expected 'flux.ndim=3', got {flux.ndim}"
