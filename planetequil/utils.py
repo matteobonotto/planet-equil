@@ -53,14 +53,14 @@ def dummy_planet_input_tensor(
     n_measures: int = 302,
     device: Optional[str | torch.device] = None,
 ) -> Tuple[Tensor, Tensor, Tensor]:
-    # if device is None>
-    device = (
-        torch.device(device) if device is not None else torch.device(get_accelerator())
-    )
+    if device is None:
+        device_ = torch.device(get_accelerator())
+    else:
+        device_ = torch.device(device)
     return (
-        torch.rand(size=(batch_size, n_measures), device=device, dtype=DTYPE),
-        torch.rand(size=(batch_size, nr, nz), device=device, dtype=DTYPE),
-        torch.rand(size=(batch_size, nr, nz), device=device, dtype=DTYPE),
+        torch.rand(size=(batch_size, n_measures), device=device_, dtype=DTYPE),
+        torch.rand(size=(batch_size, nr, nz), device=device_, dtype=DTYPE),
+        torch.rand(size=(batch_size, nr, nz), device=device_, dtype=DTYPE),
     )
 
 

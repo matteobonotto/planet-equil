@@ -91,7 +91,7 @@ def compute_Grad_Shafranov_kernels(
 ) -> Tuple[_TypeNpFloat | Tensor, _TypeNpFloat | Tensor]:
     return_tensor = False
     if isinstance(RR, Tensor):
-        device = RR.device()
+        device = RR.device
         return_tensor = True
     hr = RR[1, 2] - RR[1, 1]
     hz = ZZ[2, 1] - ZZ[1, 1]
@@ -143,7 +143,7 @@ class Scaler:
     def __init__(
         self, mean: Optional[_TypeNpFloat] = None, std: Optional[_TypeNpFloat] = None
     ) -> None:
-        if mean is not None:
+        if mean is not None and std is not None:
             self.mean = mean
             self.std = std
             self.mean_tensor = torch.tensor(mean, dtype=DTYPE)[None, ...]

@@ -13,7 +13,7 @@ from safetensors import safe_open
 
 from scipy import signal
 
-from .models import MODELS
+from .models.models import MODELS
 from .config import PlaNetConfig
 from .data import Scaler, compute_Grad_Shafranov_kernels
 from .loss import Gauss_kernel_5x5, _compute_grad_shafranov_operator
@@ -23,14 +23,15 @@ from .constants import DTYPE
 
 
 def load_model_safetensors(
-    model: nn.Module, path: str | Path, device: torch.device
+    model: nn.Module, path: str | Path, device: torch.device | str
 ) -> None:
     """Given a model, loads the layers from safetensors"""
+    device_ = torch.device(device)
     if not isinstance(path, Path):
         path = Path(path)
     try:
         state_dict: Dict[str, Tensor] = {}
-        with safe_open(path, framework="pt", device=str(device)) as f:
+        with safe_open(path, framework="pt", device=str(device_)) as f:  # type: ignore[no-untyped-call]
             for k in f.keys():
                 state_dict[k] = f.get_tensor(k)
         model.load_state_dict(state_dict)
@@ -101,7 +102,9 @@ class PlaNet:
     ) -> PlaNet:
         print(f"Loading model from {path}")
         model_path = Path(path)
-        device_ = get_accelerator() if device is None else torch.device(device)
+        device_ = (
+            torch.device(get_accelerator()) if device is None else torch.device(device)
+        )
 
         # load scaler (already fitted during training)
         scaler = Scaler.from_config(f"{path}/scaler.json")
