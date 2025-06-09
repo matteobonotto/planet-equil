@@ -96,15 +96,6 @@ def last_ckp_path(ckpt_path: str | Path) -> Path:
     return latest
 
 
-def get_accelerator() -> str:
-    if torch.backends.mps.is_available():
-        return "mps"
-    elif torch.cuda.is_available():
-        return "cuda"
-    else:
-        return "auto"
-
-
 def write_h5(
     data: Dict[str, Any],
     filename: str,

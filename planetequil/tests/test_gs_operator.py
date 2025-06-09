@@ -15,7 +15,7 @@ from planetequil.utils import load_config
 
 def test_gs_operator():
     ###
-    datamodule = DataModule(load_config("planet/tests/data/config.yml"))
+    datamodule = DataModule(load_config("planetequil/tests/data/config.yml"))
     dataloader = datamodule.train_dataloader()
     meas, flux, RHS_in, RR, ZZ, Laplace_kernel, Df_dr_kernel = next(iter(dataloader))
 
@@ -37,6 +37,10 @@ def test_gs_operator():
     ).all(), (
         "error with _compute_grad_shafranov_operator in at least one element is > 5%"
     )
+
+
+def test_gs_ope_numpy_vs_tensor():
+    assert 1 == 0
 
 
 # def test_gs_operator_():

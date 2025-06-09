@@ -150,7 +150,7 @@ class Scaler:
             self.std_tensor = torch.tensor(std, dtype=DTYPE)[None, ...]
             self.not_fitted = False
 
-    def set_device(self, device: torch.device | str) -> None:
+    def to(self, device: torch.device | str) -> None:
         self.device = torch.device(device) if isinstance(device, str) else device
         self.mean_tensor = self.mean_tensor.to(device)
         self.std_tensor = self.std_tensor.to(device)

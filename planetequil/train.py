@@ -24,7 +24,7 @@ from .models.models import MODELS
 from .loss import PlaNetLoss
 from .data import PlaNetDataset, Scaler
 from .utils import (
-    get_accelerator,
+    get_device,
     last_ckp_path,
     dummy_planet_input_tensor,
 )
@@ -233,7 +233,7 @@ def main_train(config: Config) -> None:
     ### train the model
     trainer = Trainer(
         max_epochs=config.epochs,
-        accelerator=get_accelerator(),
+        accelerator=str(get_device()),
         devices="auto",
         callbacks=callbacks,
         logger=logger,

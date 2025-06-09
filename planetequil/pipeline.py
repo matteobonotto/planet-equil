@@ -18,8 +18,8 @@ from .config import PlaNetConfig
 from .data import Scaler, compute_Grad_Shafranov_kernels
 from .loss import Gauss_kernel_5x5, _compute_grad_shafranov_operator
 from .types import _TypeNpFloat
-from .utils import get_accelerator, dummy_planet_input_tensor
 from .constants import DTYPE
+from .utils import get_device
 
 
 def load_model_safetensors(
@@ -79,13 +79,14 @@ class PlaNet:
         self.get_model_device_and_dtype()
         self.model.eval()
         self.scaler: Scaler = scaler
-        scaler.set_device(self.device)
+        scaler.to(self.device)
         self.Gauss_kernel = torch.tensor(
             Gauss_kernel_5x5, device=self.device, dtype=self.dtype
         )
 
-    def set_device(self, device: torch.device) -> None:
-        self.scaler.set_device(device)
+    def to(self, device: torch.device) -> None:
+        self.device = device
+        self.scaler.to(device)
         self.model.to(device)
 
     def get_model_device_and_dtype(self) -> None:
@@ -102,13 +103,11 @@ class PlaNet:
     ) -> PlaNet:
         print(f"Loading model from {path}")
         model_path = Path(path)
-        device_ = (
-            torch.device(get_accelerator()) if device is None else torch.device(device)
-        )
+        device_ = get_device() if device is None else torch.device(device)
 
         # load scaler (already fitted during training)
         scaler = Scaler.from_config(f"{path}/scaler.json")
-        scaler.set_device(device_)
+        scaler.to(device_)
 
         # load the core planet model
         config = PlaNetConfig(**json.load(open(model_path / Path("config.json"), "r")))
@@ -178,6 +177,9 @@ class PlaNet:
 
         # prepare the inputs [simulating batch size of 1]
         scaled_inputs = self.scaler.transform(measures, inplace=self.fast_inference)
+
+        message = f"scaled_inputs must be of type np.ndarray, got {type(scaled_inputs)}"
+        assert isinstance(scaled_inputs, np.ndarray), message
 
         # perfrom the forward pass
         inputs = self._np_to_tensor(

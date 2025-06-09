@@ -53,7 +53,7 @@ class Config:
             assert (
                 cls_instance.planet is not None
             ), "must provide valid config.planet, got None"
-            cls_instance.planet = PlaNetConfig(**cls_instance.planet_config)
+            cls_instance.planet = PlaNetConfig(**cls_instance.planet_config)  # type: ignore
 
         return cls_instance
 

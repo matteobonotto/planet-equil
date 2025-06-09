@@ -90,4 +90,4 @@ poetry.lock
 
 notebooks/trained_models/*
 notebooks/wandb/*
-!planetequil/tests/data/iter_like_data_sample.h5
+!planetequil/tests/data/planet_sample_dataset.h5

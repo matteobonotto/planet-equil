@@ -4,7 +4,7 @@ from planetequil.data import PlaNetDataset
 
 
 def test_planet_dataset():
-    ds = PlaNetDataset(path="planetequil/tests/data/iter_like_data_sample.h5")
+    ds = PlaNetDataset(path="planetequil/tests/data/planet_sample_dataset.h5")
 
     assert hasattr(ds, "RR")
     assert hasattr(ds, "ZZ")
