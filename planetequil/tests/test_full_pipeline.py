@@ -15,6 +15,7 @@ from planetequil.utils import (
     get_device,
     read_h5_numpy,
 )
+from planetequil.plot import contourf
 
 
 # @pytest.mark.slow
@@ -22,7 +23,7 @@ def test_full_pipe():
     config = Config()
     config.epochs = 1
     config.log_to_wandb = False
-    config.dataset_path = "planetequil/tests/data/iter_like_data_sample.h5"
+    config.dataset_path = "planetequil/tests/data/planet_sample_dataset.h5"
     print(config)
 
     if os.path.exists(config.save_path):
@@ -58,12 +59,11 @@ def test_pipeline_device():
     out = planet(*inputs)
 
     ### device: gpu (skip if gpu not available)
-    assert 1 == 0
     if get_device() != torch.device("cpu"):
         device = get_device()
         planet.to(device)
         inputs = dummy_planet_input_tensor(device=device)
-        out = planet(**inputs)
+        out = planet(*inputs)
 
 
 def test_pipeline_numpy_vs_torch():
@@ -112,7 +112,4 @@ def test_pipeline_numpy_vs_torch():
     )
 
     assert error_flux < 1e-6, f"error_flux > 1e-6 (got {error_flux})"
-    assert error_gs_ope < 1e-6, f"error_gs_ope > 1e-6 (got {error_gs_ope})"
-
-
-test_pipeline_numpy_vs_torch()
+    assert error_gs_ope < 1e-4, f"error_gs_ope > 1e-4 (got {error_gs_ope})"

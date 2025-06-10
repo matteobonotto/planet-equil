@@ -54,7 +54,7 @@ def dummy_planet_input_tensor(
     device: Optional[str | torch.device] = None,
 ) -> Tuple[Tensor, Tensor, Tensor]:
     if device is None:
-        device_ = torch.device(get_accelerator())
+        device_ = get_device()
     else:
         device_ = torch.device(device)
     return (

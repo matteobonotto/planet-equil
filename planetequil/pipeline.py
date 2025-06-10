@@ -88,6 +88,7 @@ class PlaNet:
         self.device = device
         self.scaler.to(device)
         self.model.to(device)
+        self.Gauss_kernel = self.Gauss_kernel.to(device)
 
     def get_model_device_and_dtype(self) -> None:
         _, param = next(iter(self.model.named_parameters()))
@@ -217,15 +218,12 @@ class PlaNet:
         rr: Tensor,
         zz: Tensor,
     ) -> Tensor:
-        assert (
-            flux.ndim == 3
-        ), f"For torch tensors, planet is compatible only with batched input. Expected 'flux.ndim=3', got {flux.ndim}"
-        assert (
-            rr.ndim == 3
-        ), f"For torch tensors, planet is compatible only with batched input. Expected 'rr.ndim=3', got {rr.ndim}"
-        assert (
-            zz.ndim == 3
-        ), f"For torch tensors, planet is compatible only with batched input. Expected 'zz.ndim=3', got {zz.ndim}"
+        if flux.ndim == 2:
+            flux = flux[None, :]
+        if rr.ndim == 2:
+            rr = torch.tile(rr[None, ...], (flux.shape[0], 1, 1))
+        if zz.ndim == 2:
+            zz = torch.tile(zz[None, ...], (flux.shape[0], 1, 1))
 
         n_batch = flux.shape[0]
         L_ker = np.zeros(shape=(n_batch, 3, 3))

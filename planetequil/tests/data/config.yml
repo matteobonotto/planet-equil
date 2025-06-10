@@ -1,6 +1,6 @@
 is_physics_informed: true
 save_path:  'trained_models/test/'
-dataset_path: planetequil/tests/data/iter_like_data_sample.h5 
+dataset_path: "planetequil/tests/data/planet_sample_dataset.h5"
 do_super_resolution: false
 batch_size: 16
 epochs: 10
